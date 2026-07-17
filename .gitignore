@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+backups/
+supabase/.temp/
+supabase/.branches/
+
+node_modules/
+.next/
+dist/
+build/
