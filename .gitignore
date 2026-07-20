@@ -10,3 +10,10 @@ node_modules/
 .next/
 dist/
 build/
+
+# TypeScript / Next build artifacts
+*.tsbuildinfo
+next-env.d.ts
+
+# test build
+.calctest/
