@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { PeriodFilter } from "@/components/shell/PeriodFilter";
 import { Tabs } from "@/components/ui/Tabs";
-import { Metric, Panel, PanelHeader, EmptyState } from "@/components/ui/primitives";
+import { Metric, MiniMetric, Panel, PanelHeader, EmptyState } from "@/components/ui/primitives";
 import { NovaVendaButton, NovoClienteButton } from "@/components/actions/QuickButtons";
 import { RegistrarProspeccaoButton } from "@/components/comercial/RegistrarProspeccaoButton";
 import { InvestimentoQuick } from "@/components/comercial/InvestimentoQuick";
@@ -11,13 +11,12 @@ import { PipelineBoard } from "@/components/comercial/PipelineBoard";
 import { FunnelChart } from "@/components/comercial/FunnelChart";
 import { MetodoBreakdownPanel } from "@/components/comercial/MetodoBreakdownPanel";
 import { TrafegoPagoPanel } from "@/components/comercial/TrafegoPagoPanel";
-import { ClientesPanel } from "@/components/comercial/ClientesPanel";
 import { VendasPanel } from "@/components/vendas/VendasPanel";
 import { EntregasPanel } from "@/components/vendas/EntregasPanel";
 import { ProdutosMetricasPanel } from "@/components/vendas/ProdutosMetricasPanel";
 import { formatBRL } from "@/lib/format";
 import { resolvePeriod } from "@/lib/period";
-import { computeEmpresaMetrics, buildProdutoBreakdown, buildClienteRows, buildAquisicaoPorMetodo, somarRegistrosProspeccao } from "@/lib/metrics";
+import { computeEmpresaMetrics, buildProdutoBreakdown, buildAquisicaoPorMetodo, somarRegistrosProspeccao } from "@/lib/metrics";
 import { funnelVision } from "@/lib/calc";
 import { ESTAGIOS_VISION } from "@/lib/labels";
 import {
@@ -40,15 +39,21 @@ export default async function VisionPage({ searchParams }: { searchParams: Promi
 
   const metrics = computeEmpresaMetrics(vision, { lancamentos, vendas, parcelas, assinaturas }, period);
   const breakdown = buildProdutoBreakdown(produtos, vendas, vision.id, period);
-  const clienteRows = buildClienteRows(vision.id, vendas, parcelas, assinaturas);
   const metodos = buildAquisicaoPorMetodo(vision.id, vendas, lancamentos, registros, period);
   const prospAgg = somarRegistrosProspeccao(registros, vision.id, period);
-  const vendasNoPeriodo = vendas.filter((v) => v.data_venda >= period.from && v.data_venda <= period.to).length;
-  const funnel = funnelVision(prospAgg, vendasNoPeriodo);
+  // Vendas do período (a lista de Vendas respeita o filtro; métricas já filtram internamente).
+  const vendasPeriodo = vendas.filter((v) => v.data_venda >= period.from && v.data_venda <= period.to);
+  const funnel = funnelVision(prospAgg, vendasPeriodo.length);
 
   const custoPorVenda = metrics.vendas > 0 ? metrics.investimento / metrics.vendas : null;
   const cacTrafego = metodos.find((m) => m.metodo === "trafego_pago")?.cac ?? null;
-  const cacProsp = metodos.find((m) => m.metodo === "prospeccao_ativa")?.cac ?? null;
+  // ROI de anúncios = faturamento ÷ investimento (substitui o CAC de prospecção).
+  const roiAnuncios = metrics.investimento > 0 ? metrics.faturamento / metrics.investimento : null;
+  // Produtividade da prospecção ativa (prospecção tem custo ~0; o que importa é a conversão).
+  const vendasProsp = vendasPeriodo.filter((v) => v.metodo_aquisicao === "prospeccao_ativa").length;
+  const abordagensProsp = prospAgg.novos_prospectados;
+  const taxaFechamentoProsp = abordagensProsp > 0 ? (vendasProsp / abordagensProsp) * 100 : null;
+  const mensagensPorVenda = vendasProsp > 0 ? abordagensProsp / vendasProsp : null;
 
   const parcelasPorVenda: Record<string, ParcelaSituacao[]> = {};
   for (const p of parcelas) if (p.venda_id) (parcelasPorVenda[p.venda_id] ??= []).push(p);
@@ -86,7 +91,7 @@ export default async function VisionPage({ searchParams }: { searchParams: Promi
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Metric label="CAC geral" value={metrics.cac === null ? "—" : formatBRL(metrics.cac)} />
                   <Metric label="CAC tráfego" value={cacTrafego === null ? "—" : formatBRL(cacTrafego)} />
-                  <Metric label="CAC prospecção" value={cacProsp === null ? (metodos.find((m) => m.metodo === "prospeccao_ativa")?.investimento === 0 ? "sem custo" : "—") : formatBRL(cacProsp)} />
+                  <Metric label="ROI anúncios" value={roiAnuncios === null ? "—" : `${roiAnuncios.toFixed(1)}x`} accent="positive" hint="Faturamento ÷ investimento" />
                   <Metric label="Custo por venda" value={custoPorVenda === null ? "—" : formatBRL(custoPorVenda)} />
                 </div>
                 <Panel>
@@ -113,6 +118,15 @@ export default async function VisionPage({ searchParams }: { searchParams: Promi
                   <PanelHeader title="Funil de prospecção" description={`Esforço agregado + vendas reais · ${period.label}`} />
                   <FunnelChart stages={funnel} />
                 </Panel>
+                <Panel>
+                  <PanelHeader title="Produtividade da prospecção" description="Prospecção tem custo ~0 — o que importa é a conversão das mensagens" />
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <MiniMetric label="Abordagens/mensagens" value={String(abordagensProsp)} />
+                    <MiniMetric label="Vendas por prospecção" value={String(vendasProsp)} accent="positive" />
+                    <MiniMetric label="Taxa de fechamento" value={taxaFechamentoProsp === null ? "—" : `${taxaFechamentoProsp.toFixed(0)}%`} />
+                    <MiniMetric label="Mensagens por venda" value={mensagensPorVenda === null ? "—" : mensagensPorVenda.toFixed(0)} />
+                  </div>
+                </Panel>
                 <PipelineBoard oportunidades={oportunidades} reunioesPorOportunidade={reunioesPorOportunidade} estagios={ESTAGIOS_VISION} options={options} empresaId={vision.id} />
               </div>
             ),
@@ -131,16 +145,8 @@ export default async function VisionPage({ searchParams }: { searchParams: Promi
             ),
           },
           {
-            label: "Clientes e vendas",
-            content: (
-              <div className="space-y-8">
-                <ClientesPanel rows={clienteRows} />
-                <div>
-                  <h3 className="mb-3 text-2xs font-semibold uppercase tracking-wide text-ink-faint">Vendas · parcelas · pagamentos</h3>
-                  <VendasPanel vendas={vendas} parcelasPorVenda={parcelasPorVenda} options={options} empresaId={vision.id} />
-                </div>
-              </div>
-            ),
+            label: "Vendas",
+            content: <VendasPanel vendas={vendasPeriodo} parcelasPorVenda={parcelasPorVenda} options={options} empresaId={vision.id} />,
           },
           { label: "Produtos", content: <ProdutosMetricasPanel breakdown={breakdown} produtos={produtos.filter((p) => p.empresa_id === vision.id)} /> },
           { label: "Entregas", content: <EntregasPanel vendas={vendas} /> },
