@@ -149,7 +149,9 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
   const diasVenda = oportunidades.filter((o) => o.fechado_em).map((o) => Math.round((new Date(o.fechado_em!).getTime() - new Date(o.criado_em).getTime()) / 86400000));
   const tv = tempoMedio(diasVenda);
 
-  // clientes / churn / LTV
+  // clientes / churn / LTV — tudo escopado às assinaturas da Digital Smile.
+  const dsAssinaturaIds = new Set(assinaturas.map((a) => a.id));
+  const dsAssinaturaCliente = new Map(assinaturas.map((a) => [a.id, a.cliente_id] as const));
   const custosDiretosPorCliente: Record<string, number> = {};
   for (const l of lancamentos) if (l.tipo === "saida" && l.cliente_id) custosDiretosPorCliente[l.cliente_id] = (custosDiretosPorCliente[l.cliente_id] ?? 0) + Number(l.valor);
   const cancelamentos = assinaturas.filter((a) => a.status === "cancelado").length;
@@ -157,9 +159,18 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
   const ativos = assinaturas.filter((a) => assinaturaVigente(a)).length;
   const churn = calcChurn(cancelamentos, ativos + cancelamentos);
   const retencao = calcRetencao(ativos, ativos + cancelamentos);
-  const ltvsPorCliente = assinaturas.map((a) => (parcelasPorAssinatura[a.id] ?? []).reduce((s, p) => s + Number(p.recebido_liquido), 0));
-  const ltvMed = ltvMedio(ltvsPorCliente.filter((v) => v > 0)) ?? 0;
-  const inadimplencia = parcelas.filter((p) => p.situacao_calculada === "atrasada" && p.assinatura_id && parcelasPorAssinatura[p.assinatura_id]).reduce((s, p) => s + Number(p.saldo_pendente), 0);
+  // LTV realizado POR CLIENTE = total efetivamente recebido do cliente (soma de
+  // todas as suas assinaturas). LTV médio = média entre clientes elegíveis (recebido > 0).
+  const recebidoPorCliente = new Map<string, number>();
+  for (const a of assinaturas) {
+    if (!a.cliente_id) continue;
+    const recebidoAss = (parcelasPorAssinatura[a.id] ?? []).reduce((s, p) => s + Number(p.recebido_liquido), 0);
+    recebidoPorCliente.set(a.cliente_id, (recebidoPorCliente.get(a.cliente_id) ?? 0) + recebidoAss);
+  }
+  const ltvMed = ltvMedio(Array.from(recebidoPorCliente.values()).filter((v) => v > 0)) ?? 0;
+  // Inadimplência = parcelas vencidas SOMENTE de assinaturas da DS (não vaza de outra empresa).
+  const parcelasAtrasadasDs = parcelas.filter((p) => p.situacao_calculada === "atrasada" && p.assinatura_id && dsAssinaturaIds.has(p.assinatura_id));
+  const inadimplencia = parcelasAtrasadasDs.reduce((s, p) => s + Number(p.saldo_pendente), 0);
   const mtTrafego = metodos.find((m) => m.metodo === "trafego_pago");
   const mtProsp = metodos.find((m) => m.metodo === "prospeccao_ativa");
   const cacTrafego = mtTrafego?.cac ?? null;
@@ -177,7 +188,7 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
   const cacGeralLabel = inv === 0 ? "sem custo" : cacGeralValor === null ? "—" : formatBRL(cacGeralValor);
   // Inadimplência: valor vencido + nº de clientes + % do total em aberto.
   const clientesInadimplentes = new Set(
-    parcelas.filter((p) => p.situacao_calculada === "atrasada" && p.assinatura_id && parcelasPorAssinatura[p.assinatura_id]).map((p) => p.assinatura_id),
+    parcelasAtrasadasDs.map((p) => dsAssinaturaCliente.get(p.assinatura_id!) ?? p.assinatura_id),
   ).size;
   const inadimplenciaPct = metrics.aReceber > 0 ? (inadimplencia / metrics.aReceber) * 100 : null;
   // Payback (meses) = CAC ÷ contribuição mensal por cliente (margem aplicada ao MRR/cliente).
@@ -245,7 +256,7 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
                   <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
                     <MiniMetric label="Abordagens" value={String(funil.abordagens)} />
                     <MiniMetric label="Respostas" value={String(funil.respostas)} />
-                    <MiniMetric label="Positivas" value={String(funil.positivas)} />
+                    <MiniMetric label="Qualificados" value={String(funil.positivas)} />
                     <MiniMetric label="Reuniões realiz." value={String(funil.reunioesRealizadas)} />
                     <MiniMetric label="Propostas" value={String(funil.propostas)} />
                     <MiniMetric label="Contratos" value={String(funil.contratos)} accent="positive" />

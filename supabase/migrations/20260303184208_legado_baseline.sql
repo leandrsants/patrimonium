@@ -1,0 +1,13 @@
+-- ============================================================================
+-- BASELINE DO LEGADO (no-op) — apenas para alinhar o histórico de migrations.
+-- ----------------------------------------------------------------------------
+-- Esta versão (20260303184208) JÁ está aplicada no projeto remoto: foi a
+-- migration do app anterior que criou as 12 tabelas legadas (clientes, vendas,
+-- fontes, pipeline, gastos_ads, entregas, ciclos, conversas, mensagens,
+-- pacotes, resumo_diario, push_subscriptions).
+--
+-- O arquivo é intencionalmente VAZIO (sem DDL): como já consta em
+-- supabase_migrations.schema_migrations no remoto, o `db push` NÃO o reexecuta.
+-- Serve só para que o histórico local case com o remoto e as migrations novas
+-- sejam aplicadas em sequência limpa, sem alertar divergência.
+-- ============================================================================
