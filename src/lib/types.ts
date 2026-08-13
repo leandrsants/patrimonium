@@ -155,6 +155,8 @@ export type Venda = {
   status_entrega: string | null;
   metodo_aquisicao: string | null;
   observacao: string | null;
+  /** Texto original escrito na venda antiga (preservado na migração do legado). */
+  legado_observacao_original: string | null;
   drive_link: string | null;
   cliente?: { nome: string; telefone: string | null } | null;
   produto?: { nome: string } | null;

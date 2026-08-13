@@ -76,7 +76,7 @@ export function ProdutividadePanel({
       <div className="overflow-x-auto rounded-xl2 border border-line">
         <table className="w-full min-w-[420px] text-sm">
           <thead>
-            <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
               <th className="px-4 py-2.5 text-left font-semibold"></th>
               <th className="px-4 py-2.5 text-right font-semibold">Hoje</th>
               <th className="px-4 py-2.5 text-right font-semibold">Semana</th>
@@ -161,7 +161,7 @@ export function DesempenhoCanalPanel({ rows }: { rows: CanalRow[] }) {
     <div className="overflow-x-auto rounded-xl2 border border-line">
       <table className="w-full min-w-[420px] text-sm">
         <thead>
-          <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+          <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
             <th className="px-4 py-3 text-left font-semibold">Canal</th>
             <th className="px-4 py-3 text-right font-semibold">Leads</th>
             <th className="px-4 py-3 text-right font-semibold">Contratos</th>

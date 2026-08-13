@@ -13,7 +13,7 @@ import type { FormOptions } from "@/components/forms/options";
 function TriggerButton({ label, onClick, variant = "secondary" }: { label: string; onClick: () => void; variant?: "primary" | "secondary" }) {
   const cls =
     variant === "primary"
-      ? "bg-ink text-canvas hover:bg-white"
+      ? "bg-ink text-canvas hover:bg-primary-hover"
       : "border border-line-strong bg-surface-raised text-ink-soft hover:bg-surface-hover hover:text-ink";
   return (
     <button onClick={onClick} className={`inline-flex h-9 items-center gap-1.5 rounded-lg2 px-3.5 text-sm font-medium transition-colors ${cls}`}>

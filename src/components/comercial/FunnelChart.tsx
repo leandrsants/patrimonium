@@ -21,7 +21,7 @@ export function FunnelChart({ stages }: { stages: FunnelStageOut[] }) {
               <div className="w-40 shrink-0 text-right text-2xs text-ink-faint">{s.label}</div>
               <div className="relative h-8 flex-1">
                 <div
-                  className="flex h-full items-center rounded-md px-3 text-xs font-medium text-canvas transition-all"
+                  className="flex h-full items-center rounded-md px-3 text-xs font-medium text-on-accent transition-all"
                   style={{ width: `${widthPct}%`, backgroundColor: ACCENT[i % ACCENT.length], minWidth: "52px" }}
                 >
                   <span className="tnum">{formatNumber(s.valor)}</span>

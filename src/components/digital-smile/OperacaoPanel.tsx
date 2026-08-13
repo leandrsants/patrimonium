@@ -28,7 +28,7 @@ export function OperacaoPanel({ assinaturas }: { assinaturas: Assinatura[] }) {
       <div className="overflow-x-auto rounded-xl2 border border-line">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
               <th className="px-4 py-3 text-left font-semibold">Cliente</th>
               <th className="px-4 py-3 text-left font-semibold">Fase</th>
               <th className="px-4 py-3 text-left font-semibold">Progresso</th>

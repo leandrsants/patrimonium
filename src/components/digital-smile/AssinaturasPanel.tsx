@@ -63,7 +63,7 @@ export function AssinaturasPanel({
       <div className="overflow-x-auto rounded-xl2 border border-line">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
               <th className="px-4 py-3 text-left font-semibold">Cliente</th>
               <th className="px-4 py-3 text-left font-semibold">Serviço</th>
               <th className="px-4 py-3 text-right font-semibold">Mensalidade</th>
@@ -75,7 +75,7 @@ export function AssinaturasPanel({
           </thead>
           <tbody>
             {filtradas.map((a) => (
-              <tr key={a.id} onClick={() => setSelected(a)} className="cursor-pointer border-b border-line/70 transition-colors last:border-0 hover:bg-white/[0.02]">
+              <tr key={a.id} onClick={() => setSelected(a)} className="cursor-pointer border-b border-line/70 transition-colors last:border-0 hover:bg-surface-hover">
                 <td className="px-4 py-3 font-medium text-ink">{a.cliente?.nome ?? "—"}</td>
                 <td className="px-4 py-3 text-ink-faint">{a.produto?.nome ?? "—"}</td>
                 <td className="px-4 py-3 text-right tnum text-ink-soft">{formatBRL(a.valor_mensal)}</td>

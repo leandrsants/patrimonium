@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Panel, PanelHeader, MiniMetric, Badge } from "@/components/ui/primitives";
 import { ConfigWorkspace } from "@/components/config/ConfigWorkspace";
+import { AppearanceSettings } from "@/components/theme/AppearanceSettings";
 import { formatBRL, formatDateBR } from "@/lib/format";
 import { METODOS } from "@/lib/calc";
 import { getEmpresas, getProdutos, getCategorias, getCanais, getContas, getCartoes, getMetaAtiva } from "@/lib/data";
@@ -22,6 +23,11 @@ export default async function ConfiguracoesPage() {
         <MiniMetric label="Origens" value={String(canais.length)} />
         <MiniMetric label="Contas" value={String(contas.length)} />
       </div>
+
+      <Panel>
+        <PanelHeader title="Aparência" description="Tema da interface — aplicado na hora e salvo neste dispositivo" />
+        <AppearanceSettings />
+      </Panel>
 
       <ConfigWorkspace empresas={empresas} produtos={produtos} categorias={categorias} canais={canais} />
 

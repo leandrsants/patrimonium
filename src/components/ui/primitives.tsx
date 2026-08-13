@@ -65,12 +65,15 @@ export function Metric({
   hint,
   accent = "neutral",
   size = "md",
+  trend,
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: Accent;
   size?: "md" | "lg";
+  /** Variação vs. período anterior equivalente. pct null = sem base de comparação. */
+  trend?: { pct: number | null };
 }) {
   return (
     <div className="rounded-xl2 border border-line bg-surface p-5 shadow-panel transition-colors hover:border-line-strong">
@@ -78,8 +81,27 @@ export function Metric({
       <p className={`mt-2 font-semibold tnum ${size === "lg" ? "text-[1.75rem] leading-8" : "text-2xl"} ${ACCENT_TEXT[accent]}`}>
         {value}
       </p>
+      {trend ? <TrendBadge pct={trend.pct} /> : null}
       {hint ? <p className="mt-1 text-2xs text-ink-dim">{hint}</p> : null}
     </div>
+  );
+}
+
+/** Variação percentual discreta vs. período anterior (direcional: sobe = verde, desce = vermelho). */
+function TrendBadge({ pct }: { pct: number | null }) {
+  if (pct === null) {
+    return <span className="mt-1.5 inline-flex items-center gap-1 text-2xs text-ink-dim">novo · sem base anterior</span>;
+  }
+  const neutro = Math.abs(pct) < 0.05;
+  const sobe = pct > 0;
+  const tone = neutro ? "text-ink-faint" : sobe ? "text-positive" : "text-negative";
+  const seta = neutro ? "→" : sobe ? "▲" : "▼";
+  return (
+    <span className={`mt-1.5 inline-flex items-center gap-1 text-2xs tnum ${tone}`}>
+      <span>{seta}</span>
+      {Math.abs(pct).toFixed(1)}%
+      <span className="text-ink-dim">vs. anterior</span>
+    </span>
   );
 }
 
@@ -102,7 +124,7 @@ export function Badge({
   subtle?: boolean;
 }) {
   const bg: Record<Accent, string> = {
-    neutral: "bg-white/[0.06] text-ink-soft",
+    neutral: "bg-line-strong text-ink-soft",
     vision: "bg-vision-dim text-vision",
     smile: "bg-smile-dim text-smile",
     extra: "bg-extra-dim text-extra",
@@ -129,7 +151,7 @@ export function Progress({ value, accent = "vision" }: { value: number; accent?:
     warning: "bg-warning",
   };
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-line-strong">
       <div className={`h-full rounded-full transition-all ${bar[accent]}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );

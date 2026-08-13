@@ -33,7 +33,7 @@ export function ChecklistToggle({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-2xs text-ink-faint">{done} de {steps.length} concluídos</span>
-        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line-strong">
           <div className="h-full rounded-full bg-positive transition-all" style={{ width: `${(done / steps.length) * 100}%` }} />
         </div>
       </div>

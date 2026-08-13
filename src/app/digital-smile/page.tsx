@@ -214,7 +214,7 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Empresa · Agência" title="Digital Smile" subtitle="Gestão de tráfego para dentistas e clínicas" accent="smile" actions={<PeriodFilter current={period.kind} />} />
+      <PageHeader eyebrow="Empresa · Agência" title="Digital Smile" subtitle="Gestão de tráfego para dentistas e clínicas" accent="smile" actions={<PeriodFilter period={period} />} />
 
       <Tabs
         tabs={[
@@ -276,7 +276,7 @@ export default async function DigitalSmilePage({ searchParams }: { searchParams:
                   ) : (
                     <div className="overflow-x-auto rounded-xl2 border border-line">
                       <table className="w-full min-w-[520px] text-sm">
-                        <thead><tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+                        <thead><tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                           <th className="px-4 py-2.5 text-left font-semibold">Método</th><th className="px-4 py-2.5 text-right font-semibold">Clientes</th><th className="px-4 py-2.5 text-right font-semibold">Custo</th><th className="px-4 py-2.5 text-right font-semibold">CAC</th><th className="px-4 py-2.5 text-right font-semibold">Receita</th>
                         </tr></thead>
                         <tbody>{aquisicaoRows.map((m) => (

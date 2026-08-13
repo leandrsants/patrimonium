@@ -49,7 +49,7 @@ export function SplitBar({ parts }: { parts: { label: string; value: number; col
   const total = parts.reduce((s, p) => s + p.value, 0);
   return (
     <div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/[0.05]">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-line-strong">
         {total > 0
           ? parts.map((p, i) => (
               <div key={i} style={{ width: `${(p.value / total) * 100}%`, backgroundColor: p.color }} title={`${p.label}: ${formatBRL(p.value)}`} />

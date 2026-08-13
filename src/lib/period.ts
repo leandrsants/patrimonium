@@ -34,7 +34,7 @@ export function resolvePeriod(sp: Record<string, string | string[] | undefined>)
   if (kind === "custom") {
     const from = typeof sp.from === "string" ? sp.from : `${y}-${String(m + 1).padStart(2, "0")}-01`;
     const to = typeof sp.to === "string" ? sp.to : iso(new Date(y, m + 1, 0));
-    return { kind, from, to, label: "Personalizado" };
+    return { kind, from, to, label: formatRangeShort(from, to) };
   }
 
   // mês corrente (default)
@@ -42,6 +42,33 @@ export function resolvePeriod(sp: Record<string, string | string[] | undefined>)
   const to = new Date(y, m + 1, 0);
   const nomeMes = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(now);
   return { kind: "mes", from: iso(from), to: iso(to), label: nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) };
+}
+
+const MES_ABBR = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Intervalo compacto para o chip do filtro/label: "22 jun – 21 jul". */
+export function formatRangeShort(from: string, to: string): string {
+  const part = (s: string) => {
+    const [, m, d] = s.split("-").map(Number);
+    return `${d} ${MES_ABBR[(m ?? 1) - 1]}`;
+  };
+  return `${part(from)} – ${part(to)}`;
+}
+
+/**
+ * Período imediatamente anterior, com a MESMA duração em dias do período atual.
+ * Ex.: 10 dias -> os 10 dias anteriores; mês -> mês anterior equivalente. Usa UTC
+ * para a aritmética de datas (evita saltos de fuso/DST).
+ */
+export function previousPeriod(period: Period): Period {
+  const DAY = 86400000;
+  const from = new Date(`${period.from}T00:00:00Z`);
+  const to = new Date(`${period.to}T00:00:00Z`);
+  const dias = Math.round((to.getTime() - from.getTime()) / DAY) + 1;
+  const prevTo = new Date(from.getTime() - DAY);
+  const prevFrom = new Date(prevTo.getTime() - (dias - 1) * DAY);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  return { kind: period.kind, from: fmt(prevFrom), to: fmt(prevTo), label: "Período anterior" };
 }
 
 export function inRange(date: string | null | undefined, period: Period): boolean {

@@ -29,7 +29,7 @@ export function DataTable<T>({
     <div className="overflow-x-auto rounded-xl2 border border-line">
       <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-line bg-white/[0.015]">
+          <tr className="border-b border-line bg-surface-raised">
             {columns.map((col, i) => (
               <th
                 key={i}
@@ -59,7 +59,7 @@ export function DataTable<T>({
             return (
               <tr
                 key={keyOf(row)}
-                className={`border-b border-line/70 transition-colors last:border-0 hover:bg-white/[0.02] ${href ? "cursor-pointer" : ""}`}
+                className={`border-b border-line/70 transition-colors last:border-0 hover:bg-surface-hover ${href ? "cursor-pointer" : ""}`}
               >
                 {Cells}
               </tr>

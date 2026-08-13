@@ -18,6 +18,7 @@ export function TrafegoPagoPanel({
   investimentoTotal,
   clientesNovos,
   cac,
+  receita,
   options,
   empresaId,
   variante,
@@ -26,17 +27,20 @@ export function TrafegoPagoPanel({
   investimentoTotal: number;
   clientesNovos: number;
   cac: number | null;
+  /** Receita do período para o ROAS (faturamento ÷ investimento). */
+  receita: number;
   options: FormOptions;
   empresaId: string;
   variante: "vision" | "smile";
 }) {
+  const roas = safeRatio(receita, investimentoTotal);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Metric label="Investimento (período)" value={formatBRL(investimentoTotal)} accent={variante} />
         <Metric label="Clientes conquistados" value={String(clientesNovos)} />
         <Metric label="CAC" value={cac === null ? "—" : formatBRL(cac)} />
-        <Metric label="ROAS" value={safeRatio(campanhas.reduce((s, c) => s + c.receitaAtribuida, 0), investimentoTotal) === null ? "—" : `${safeRatio(campanhas.reduce((s, c) => s + c.receitaAtribuida, 0), investimentoTotal)!.toFixed(2)}x`} />
+        <Metric label="ROAS" value={roas === null ? "—" : `${roas.toFixed(2)}x`} hint="Faturamento ÷ investimento" />
       </div>
 
       <div className="flex items-center justify-between">

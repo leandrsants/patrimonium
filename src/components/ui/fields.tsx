@@ -13,7 +13,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 const baseInput =
-  "w-full rounded-lg2 border border-line bg-surface-input px-3 py-2 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-line-strong focus:ring-2 focus:ring-white/5";
+  "w-full rounded-lg2 border border-line bg-surface-input px-3 py-2 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-line-strong focus:ring-2 focus:ring-ink/10";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${baseInput} ${props.className ?? ""}`} />;

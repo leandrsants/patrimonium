@@ -5,8 +5,8 @@ import { PeriodFilter } from "@/components/shell/PeriodFilter";
 import { Metric, MiniMetric, Panel, PanelHeader, Progress, Badge, LinkCard } from "@/components/ui/primitives";
 import { BarChart, SplitBar } from "@/components/charts/BarChart";
 import { formatBRL, formatDateBR, formatPercent } from "@/lib/format";
-import { resolvePeriod, daysUntil } from "@/lib/period";
-import { computeDashboard, computeAttention, monthlySeries } from "@/lib/metrics";
+import { resolvePeriod, previousPeriod, daysUntil } from "@/lib/period";
+import { computeDashboard, computeAttention, monthlySeries, pctDelta } from "@/lib/metrics";
 import {
   getEmpresas, getLancamentos, getVendas, getParcelasSituacao, getAssinaturas,
   getContasSaldos, getComprasCartao, getOportunidades, getMetaAtiva, getMetaConfirmado,
@@ -22,6 +22,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ]);
 
   const m = computeDashboard({ empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras }, period);
+  // Comparação com o período anterior de MESMA duração (mesmos dados, mesma lógica).
+  const periodoAnterior = previousPeriod(period);
+  const mAnt = computeDashboard({ empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras }, periodoAnterior);
   const attention = computeAttention({ parcelas, assinaturas, vendas, oportunidades });
   const chart = monthlySeries(vendas, lancamentos, new Date().getFullYear());
 
@@ -37,16 +40,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         eyebrow="Painel"
         title="Visão geral"
         subtitle="Situação financeira e gerencial consolidada"
-        actions={<PeriodFilter current={period.kind} />}
+        actions={<PeriodFilter period={period} />}
       />
       <p className="-mt-4 text-2xs text-ink-dim">Período: {period.label} · {formatDateBR(period.from)} — {formatDateBR(period.to)}</p>
 
       {/* Indicadores principais */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Faturamento dos negócios" value={formatBRL(m.faturamentoNegocios)} accent="neutral" size="lg" hint="Vision + Digital Smile" />
-        <Metric label="Total recebido" value={formatBRL(m.totalRecebido)} accent="positive" size="lg" hint="Negócios + extras" />
-        <Metric label="Investimento em aquisição" value={formatBRL(m.investimentoAquisicao)} accent="vision" size="lg" hint="Somente anúncios" />
-        <Metric label="Lucro dos negócios" value={formatBRL(m.lucroNegocios)} accent={m.lucroNegocios >= 0 ? "positive" : "negative"} size="lg" hint="Recebido − despesas empresariais" />
+        <Metric label="Faturamento dos negócios" value={formatBRL(m.faturamentoNegocios)} accent="neutral" size="lg" hint="Vision + Digital Smile" trend={{ pct: pctDelta(m.faturamentoNegocios, mAnt.faturamentoNegocios) }} />
+        <Metric label="Total recebido" value={formatBRL(m.totalRecebido)} accent="positive" size="lg" hint="Negócios + extras" trend={{ pct: pctDelta(m.totalRecebido, mAnt.totalRecebido) }} />
+        <Metric label="Investimento em aquisição" value={formatBRL(m.investimentoAquisicao)} accent="vision" size="lg" hint="Somente anúncios" trend={{ pct: pctDelta(m.investimentoAquisicao, mAnt.investimentoAquisicao) }} />
+        <Metric label="Lucro dos negócios" value={formatBRL(m.lucroNegocios)} accent={m.lucroNegocios >= 0 ? "positive" : "negative"} size="lg" hint="Recebido − despesas empresariais" trend={{ pct: pctDelta(m.lucroNegocios, mAnt.lucroNegocios) }} />
       </div>
 
       {/* Meta + secundários */}
@@ -88,9 +91,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <BarChart
             groups={chart}
             series={[
-              { label: "Faturamento", color: "#cda349" },
-              { label: "Despesas", color: "#f0616d" },
-              { label: "Lucro", color: "#3ecf8e" },
+              { label: "Faturamento", color: "rgb(var(--vision))" },
+              { label: "Despesas", color: "rgb(var(--negative))" },
+              { label: "Lucro", color: "rgb(var(--positive))" },
             ]}
           />
         </Panel>
@@ -98,8 +101,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <PanelHeader title="Faturamento por empresa" />
           <SplitBar
             parts={[
-              { label: "Vision", value: m.vision.faturamento, color: "#cda349" },
-              { label: "Digital Smile", value: m.digitalSmile.faturamento, color: "#3d8bfd" },
+              { label: "Vision", value: m.vision.faturamento, color: "rgb(var(--vision))" },
+              { label: "Digital Smile", value: m.digitalSmile.faturamento, color: "rgb(var(--smile))" },
             ]}
           />
           <p className="mt-6 text-2xs text-ink-dim">Receitas extras não entram no faturamento das empresas.</p>

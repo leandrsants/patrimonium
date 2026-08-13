@@ -32,7 +32,7 @@ export function CampanhasTrafegoPanel({ campanhas, options, empresaId }: { campa
     <div className="overflow-x-auto rounded-xl2 border border-line">
       <table className="w-full min-w-[820px] text-sm">
         <thead>
-          <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+          <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
             <th className="px-3 py-3 text-left font-semibold">Campanha</th>
             <th className="px-3 py-3 text-right font-semibold">Invest.</th>
             <th className="px-3 py-3 text-right font-semibold">Leads</th>

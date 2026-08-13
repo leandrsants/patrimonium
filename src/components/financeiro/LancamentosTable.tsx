@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, EmptyState } from "@/components/ui/primitives";
 import { SegmentedControl } from "@/components/ui/Tabs";
 import { formatBRL, formatDateBR } from "@/lib/format";
+import { cancelarLancamento, excluirLancamento, reativarLancamento } from "@/lib/actions";
 import type { Lancamento } from "@/lib/types";
 
 type FiltroEmpresa = "todos" | "vision" | "digital_smile" | "extra" | "pessoal";
@@ -36,7 +38,9 @@ export function LancamentosTable({
     return base.filter((l) => l.empresa_id && empresasMap[l.empresa_id]?.slug === filtro);
   }, [base, filtro, empresasMap]);
 
-  const total = filtradas.reduce((s, l) => s + Number(l.valor), 0);
+  // Cancelado nao entra em nenhum calculo do metrics.ts -- o total da tabela
+  // precisa concordar com isso, senao o rodape briga com o dashboard.
+  const total = filtradas.reduce((s, l) => (l.status === "cancelado" ? s : s + Number(l.valor)), 0);
 
   return (
     <div className="space-y-4">
@@ -58,33 +62,196 @@ export function LancamentosTable({
         <EmptyState title={emptyLabel} description="Use o botão Adicionar para registrar. Os lançamentos aparecerão aqui com filtro por empresa, extra e pessoal." />
       ) : (
         <div className="overflow-x-auto rounded-xl2 border border-line">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
-              <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+              <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                 <th className="px-4 py-3 text-left font-semibold">Data</th>
                 <th className="px-4 py-3 text-left font-semibold">Descrição</th>
                 <th className="px-4 py-3 text-left font-semibold">Classificação</th>
                 <th className="px-4 py-3 text-left font-semibold">Conta</th>
                 <th className="px-4 py-3 text-right font-semibold">Valor</th>
                 <th className="px-4 py-3 text-right font-semibold">Status</th>
+                <th className="w-10 px-2 py-3">
+                  <span className="sr-only">Ações</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filtradas.map((l) => (
-                <tr key={l.id} className="border-b border-line/70 last:border-0">
-                  <td className="px-4 py-3 text-ink-faint">{formatDateBR(l.data_pagamento ?? l.data_competencia)}</td>
-                  <td className="px-4 py-3 text-ink-soft">{l.observacao ?? l.categoria?.nome ?? l.cliente?.nome ?? "—"}{l.entra_no_cac ? <span className="ml-2 text-2xs text-vision">CAC</span> : null}</td>
-                  <td className="px-4 py-3 text-ink-faint">{classif(l, empresasMap)}</td>
-                  <td className="px-4 py-3 text-ink-faint">{l.conta?.nome ?? "—"}</td>
-                  <td className={`px-4 py-3 text-right tnum ${tipo === "entrada" ? "text-positive" : "text-negative"}`}>{formatBRL(l.valor)}</td>
-                  <td className="px-4 py-3 text-right"><Badge accent={STATUS_ACCENT[l.status]}>{l.status}</Badge></td>
-                </tr>
-              ))}
+              {filtradas.map((l) => {
+                const cancelado = l.status === "cancelado";
+                return (
+                  <tr key={l.id} className="border-b border-line/70 last:border-0">
+                    <td className="px-4 py-3 text-ink-faint">{formatDateBR(l.data_pagamento ?? l.data_competencia)}</td>
+                    <td className={`px-4 py-3 ${cancelado ? "text-ink-faint line-through" : "text-ink-soft"}`}>{l.observacao ?? l.categoria?.nome ?? l.cliente?.nome ?? "—"}{l.entra_no_cac ? <span className="ml-2 text-2xs text-vision no-underline">CAC</span> : null}</td>
+                    <td className="px-4 py-3 text-ink-faint">{classif(l, empresasMap)}</td>
+                    <td className="px-4 py-3 text-ink-faint">{l.conta?.nome ?? "—"}</td>
+                    <td className={`px-4 py-3 text-right tnum ${cancelado ? "text-ink-faint line-through" : tipo === "entrada" ? "text-positive" : "text-negative"}`}>{formatBRL(l.valor)}</td>
+                    <td className="px-4 py-3 text-right"><Badge accent={STATUS_ACCENT[l.status]}>{l.status}</Badge></td>
+                    <td className="px-2 py-3 text-right"><RowActions lancamento={l} /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Menu por linha. "Cancelar" e o caminho padrao (preserva o historico);
+ * "Excluir" apaga de vez e por isso pede uma segunda confirmacao explicita.
+ */
+function RowActions({ lancamento }: { lancamento: Lancamento }) {
+  const router = useRouter();
+  const [aberto, setAberto] = useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  // A tabela vive dentro de um overflow-x-auto, que recorta qualquer filho
+  // absoluto. Por isso o menu é `fixed`, com a posição medida a partir do botão.
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const botaoRef = useRef<HTMLButtonElement>(null);
+
+  const cancelado = lancamento.status === "cancelado";
+
+  useEffect(() => {
+    if (!aberto) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) fechar();
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") fechar();
+    }
+    // Rolar ou redimensionar deixaria o menu solto longe do botão.
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    window.addEventListener("scroll", fechar, true);
+    window.addEventListener("resize", fechar);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+      window.removeEventListener("scroll", fechar, true);
+      window.removeEventListener("resize", fechar);
+    };
+  }, [aberto]);
+
+  function abrir() {
+    const r = botaoRef.current?.getBoundingClientRect();
+    if (r) setCoords({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    setAberto(true);
+  }
+
+  function fechar() {
+    setAberto(false);
+    setConfirmandoExclusao(false);
+    setErro(null);
+  }
+
+  async function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
+    setPending(true);
+    setErro(null);
+    const res = await fn();
+    setPending(false);
+    if (res.ok) {
+      fechar();
+      router.refresh();
+    } else {
+      setErro(res.error ?? "Não foi possível concluir.");
+    }
+  }
+
+  return (
+    <div ref={ref} className="inline-block text-left">
+      <button
+        ref={botaoRef}
+        onClick={() => (aberto ? fechar() : abrir())}
+        aria-label="Ações do lançamento"
+        aria-expanded={aberto}
+        className="flex h-7 w-7 items-center justify-center rounded-lg2 text-ink-faint transition-colors hover:bg-surface-hover hover:text-ink"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <circle cx="5" cy="12" r="1.9" />
+          <circle cx="12" cy="12" r="1.9" />
+          <circle cx="19" cy="12" r="1.9" />
+        </svg>
+      </button>
+
+      {aberto && coords ? (
+        <div
+          style={{ top: coords.top, right: coords.right }}
+          className="fixed z-50 w-60 overflow-hidden rounded-xl2 border border-line bg-surface-raised p-1 text-left shadow-lg"
+        >
+          {confirmandoExclusao ? (
+            <div className="p-2">
+              <p className="text-xs text-ink-soft">
+                Excluir <span className="font-semibold text-ink">{formatBRL(lancamento.valor)}</span> definitivamente? A linha sai do banco — só o registro em auditoria permanece.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => run(() => excluirLancamento(lancamento.id))}
+                  disabled={pending}
+                  className="flex-1 rounded-lg2 border border-negative/30 bg-negative-dim px-2 py-1.5 text-xs font-medium text-negative transition-colors hover:bg-negative/20 disabled:opacity-50"
+                >
+                  {pending ? "Excluindo…" : "Excluir"}
+                </button>
+                <button
+                  onClick={() => setConfirmandoExclusao(false)}
+                  disabled={pending}
+                  className="flex-1 rounded-lg2 border border-line-strong px-2 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-surface-hover disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {cancelado ? (
+                <MenuItem onClick={() => run(() => reativarLancamento(lancamento.id))} disabled={pending}>
+                  Reativar lançamento
+                </MenuItem>
+              ) : (
+                <MenuItem onClick={() => run(() => cancelarLancamento(lancamento.id))} disabled={pending}>
+                  Cancelar
+                  <span className="block text-2xs text-ink-faint">Sai dos cálculos, fica no histórico</span>
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => setConfirmandoExclusao(true)} disabled={pending} danger>
+                Excluir
+                <span className="block text-2xs text-ink-faint">Apaga a linha do banco</span>
+              </MenuItem>
+            </>
+          )}
+          {erro ? <p className="px-2 pb-2 pt-1 text-2xs text-negative">{erro}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  disabled,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full rounded-lg2 px-2.5 py-2 text-left text-xs font-medium transition-colors disabled:opacity-50 ${
+        danger ? "text-negative hover:bg-negative-dim" : "text-ink-soft hover:bg-surface-hover hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

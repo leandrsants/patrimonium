@@ -2,24 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ==========================================================================
+   TEMA — tokens semânticos em canais "R G B".
+   :root         = ESCURO (padrão / identidade original do Patrimonium)
+   [data-theme=light] = CLARO (off-white premium)
+   O atributo data-theme é aplicado antes da pintura pelo ThemeScript, e
+   gerenciado em runtime pelo ThemeProvider (Claro / Escuro / Sistema).
+   ========================================================================== */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
   --font-sans: -apple-system, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --canvas: 10 11 14;
+  --surface: 16 18 22;
+  --surface-raised: 21 24 30;
+  --surface-hover: 26 30 37;
+  --surface-input: 13 15 19;
+
+  --line: 33 36 43;
+  --line-strong: 48 52 61;
+
+  --ink: 243 244 246;
+  --ink-soft: 161 164 170;
+  --ink-faint: 112 116 124;
+  --ink-dim: 78 82 91;
+
+  --vision: 205 163 73;
+  --vision-soft: 224 197 131;
+  --vision-dim: 42 38 29;
+
+  --smile: 61 139 253;
+  --smile-soft: 124 176 255;
+  --smile-dim: 22 35 54;
+
+  --extra: 155 122 214;
+  --extra-dim: 35 33 49;
+
+  --positive: 62 207 142;
+  --positive-dim: 22 43 38;
+
+  --negative: 240 97 109;
+  --negative-dim: 45 28 33;
+
+  --warning: 224 166 77;
+  --warning-dim: 43 37 29;
+
+  --on-accent: 12 14 18;
+  --primary-hover: 255 255 255;
+  --overlay: 0 0 0;
+
+  --shadow-panel: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.8);
+  --shadow-drawer: -24px 0 60px -20px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: 247 248 250;
+  --surface: 255 255 255;
+  --surface-raised: 243 245 248;
+  --surface-hover: 236 239 244;
+  --surface-input: 250 251 252;
+
+  --line: 226 229 234;
+  --line-strong: 205 210 218;
+
+  --ink: 24 27 33;
+  --ink-soft: 82 89 99;
+  --ink-faint: 116 123 134;
+  --ink-dim: 138 145 156;
+
+  --vision: 165 123 28;
+  --vision-soft: 210 176 92;
+  --vision-dim: 247 240 221;
+
+  --smile: 26 108 224;
+  --smile-soft: 92 150 240;
+  --smile-dim: 228 238 255;
+
+  --extra: 116 82 190;
+  --extra-dim: 238 232 250;
+
+  --positive: 18 135 86;
+  --positive-dim: 219 242 231;
+
+  --negative: 202 46 66;
+  --negative-dim: 251 227 230;
+
+  --warning: 162 110 22;
+  --warning-dim: 249 239 216;
+
+  --on-accent: 12 14 18;
+  --primary-hover: 44 49 58;
+  --overlay: 17 24 39;
+
+  --shadow-panel: 0 1px 2px 0 rgba(16, 24, 40, 0.04), 0 4px 12px -6px rgba(16, 24, 40, 0.08);
+  --shadow-drawer: -16px 0 48px -20px rgba(16, 24, 40, 0.16);
+  --shadow-pop: 0 12px 32px -10px rgba(16, 24, 40, 0.16);
 }
 
 html {
-  color-scheme: dark;
+  background-color: rgb(var(--canvas));
 }
 
 body {
-  background-color: #0a0b0e;
-  color: #f3f4f6;
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+/* Transição suave ao alternar o tema (aplicada só durante a troca). */
+:root.theme-transition * {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
 ::selection {
-  background-color: rgba(205, 163, 73, 0.28);
+  background-color: rgb(var(--vision) / 0.28);
+  color: rgb(var(--ink));
 }
 
 .tnum {
@@ -27,23 +131,23 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* Scrollbars discretas */
+/* Scrollbars discretas — tematizadas */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgb(var(--ink-dim) / 0.6) transparent;
 }
 *::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgb(var(--ink-dim) / 0.55);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgb(var(--ink-dim) / 0.8);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -51,20 +155,20 @@ body {
 
 /* Grid pattern sutil no fundo do app */
 .bg-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(var(--ink) / 0.03) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--ink) / 0.05);
 }
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--ink) / 0.06), transparent);
   animation: shimmer 1.4s infinite;
 }

@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { Field, TextInput, Textarea, Select, DateInput, MoneyInput, parseMoney } from "@/components/ui/fields";
 import { FormFields, FormFooter, useFormSubmit } from "@/components/forms/FormShell";
 import { criarVenda, converterOportunidadeEmVenda, converterOportunidadeEmAssinatura } from "@/lib/actions";
-import { canalOptions, clienteOptions, hoje, type FormOptions } from "@/components/forms/options";
+import { canalOptions, clienteOptions, contaOptions, hoje, type FormOptions } from "@/components/forms/options";
 import { METODOS } from "@/lib/calc";
+import { ENTREGA_LABEL } from "@/lib/labels";
 import type { RegraPagamento, Oportunidade } from "@/lib/types";
 
 const REGRAS = [
@@ -13,6 +14,16 @@ const REGRAS = [
   { value: "50_50", label: "50% antes / 50% na entrega" },
   { value: "personalizado", label: "Personalizado" },
 ];
+
+// O caso normal é a venda já efetuada: dinheiro na conta e trabalho entregue.
+// Cobrança em aberto e entrega em andamento são a exceção, escolhida à mão.
+const PAGAMENTOS = [
+  { value: "recebido", label: "Recebido — venda quitada" },
+  { value: "a_receber", label: "A receber — gerar cobrança" },
+];
+
+const ENTREGAS = ["entregue", "finalizado", "aguardando_material", "em_producao", "aguardando_aprovacao"]
+  .map((v) => ({ value: v, label: ENTREGA_LABEL[v] }));
 
 export function VendaForm({
   options,
@@ -47,6 +58,9 @@ export function VendaForm({
   const [metodo, setMetodo] = useState(oportunidade?.metodo_aquisicao ?? "");
   const [dia, setDia] = useState("10");
   const [obs, setObs] = useState("");
+  const [pagamento, setPagamento] = useState<"recebido" | "a_receber">("recebido");
+  const [conta, setConta] = useState(options.contas.find((c) => c.ativa)?.id ?? options.contas[0]?.id ?? "");
+  const [entrega, setEntrega] = useState("entregue");
 
   // Serviço recorrente (modelo da Digital Smile) fecha como ASSINATURA/contrato,
   // não como venda avulsa — é o que alimenta Clientes e Contratos, Operação e MRR.
@@ -81,7 +95,7 @@ export function VendaForm({
   const valorFinal = parseMoney(valor) - parseMoney(desconto);
 
   function condicao(): RegraPagamento {
-    if (regra === "100_antes") return { tipo: "100_antes" };
+    if (pagamento === "recebido" || regra === "100_antes") return { tipo: "100_antes" };
     if (regra === "50_50") return { tipo: "50_50" };
     return { tipo: "personalizado", antes_pct: Number(antesPct) || 50, entrega_pct: 100 - (Number(antesPct) || 50) };
   }
@@ -111,6 +125,9 @@ export function VendaForm({
         canal_id: canal || undefined,
         fonte: fonte || undefined,
         observacao: obs,
+        pagamento,
+        conta_id: pagamento === "recebido" ? conta || undefined : undefined,
+        status_entrega: entrega,
       }));
     }
     return run(() => criarVenda({
@@ -125,6 +142,9 @@ export function VendaForm({
       metodo_aquisicao: metodo,
       oportunidade_id: oppId,
       observacao: obs,
+      pagamento,
+      conta_id: pagamento === "recebido" ? conta || undefined : undefined,
+      status_entrega: entrega,
     }));
   }
 
@@ -171,14 +191,36 @@ export function VendaForm({
         </div>
         {ehContrato ? null : (
           <>
-            <Field label="Condição de pagamento" hint="Fotos: 100% antes · Vídeo/Site: 50/50 · Combo: personalizado">
-              <Select value={regra} onChange={setRegra} options={REGRAS} />
-            </Field>
-            {regra === "personalizado" ? (
-              <Field label="% pago antes da entrega">
-                <TextInput value={antesPct} onChange={(e) => setAntesPct(e.target.value.replace(/\D/g, ""))} inputMode="numeric" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pagamento">
+                <Select value={pagamento} onChange={(v) => setPagamento(v as "recebido" | "a_receber")} options={PAGAMENTOS} />
               </Field>
-            ) : null}
+              <Field label="Entrega">
+                <Select value={entrega} onChange={setEntrega} options={ENTREGAS} />
+              </Field>
+            </div>
+            {pagamento === "recebido" ? (
+              options.contas.length ? (
+                <Field label="Conta que recebeu *">
+                  <Select value={conta} onChange={setConta} options={contaOptions(options)} placeholder="Selecionar…" />
+                </Field>
+              ) : (
+                <div className="rounded-lg2 border border-warning/30 bg-warning-dim px-3 py-2.5 text-xs text-ink-soft">
+                  Nenhuma <span className="font-medium text-ink">conta</span> cadastrada. Crie uma em <span className="font-medium text-ink">Financeiro → Contas</span> ou registre a venda como <span className="font-medium text-ink">a receber</span>.
+                </div>
+              )
+            ) : (
+              <>
+                <Field label="Condição de pagamento" hint="Fotos: 100% antes · Vídeo/Site: 50/50 · Combo: personalizado">
+                  <Select value={regra} onChange={setRegra} options={REGRAS} />
+                </Field>
+                {regra === "personalizado" ? (
+                  <Field label="% pago antes da entrega">
+                    <TextInput value={antesPct} onChange={(e) => setAntesPct(e.target.value.replace(/\D/g, ""))} inputMode="numeric" />
+                  </Field>
+                ) : null}
+              </>
+            )}
           </>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -201,7 +243,11 @@ export function VendaForm({
 
         <div className="rounded-lg2 border border-line bg-surface-input px-3 py-2 text-xs text-ink-faint">
           {ehContrato ? "Mensalidade" : "Valor final"}: <span className="tnum font-medium text-ink">{valorFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
-          {ehContrato ? " · cria a assinatura (contrato) e entra em onboarding." : " · as parcelas serão geradas automaticamente."}
+          {ehContrato
+            ? " · cria a assinatura (contrato) e entra em onboarding."
+            : pagamento === "recebido"
+              ? " · entra como recebido na conta escolhida, sem cobrança em aberto."
+              : " · as parcelas da condição escolhida ficam em aberto para cobrar depois."}
         </div>
       </FormFields>
 

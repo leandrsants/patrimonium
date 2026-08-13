@@ -40,9 +40,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
 
   const somaPor = (slug: string) => saidasPeriodo.filter((l) => l.empresa_id && empresasMap[l.empresa_id]?.slug === slug).reduce((s, l) => s + Number(l.valor), 0);
   const composicao = [
-    { label: "Vision", value: somaPor("vision"), color: "#cda349" },
-    { label: "Digital Smile", value: somaPor("digital_smile"), color: "#3d8bfd" },
-    { label: "Pessoal", value: saidasPeriodo.filter((l) => l.natureza === "despesa_pessoal").reduce((s, l) => s + Number(l.valor), 0), color: "#9b7ad6" },
+    { label: "Vision", value: somaPor("vision"), color: "rgb(var(--vision))" },
+    { label: "Digital Smile", value: somaPor("digital_smile"), color: "rgb(var(--smile))" },
+    { label: "Pessoal", value: saidasPeriodo.filter((l) => l.natureza === "despesa_pessoal").reduce((s, l) => s + Number(l.valor), 0), color: "rgb(var(--extra))" },
   ];
 
   return (

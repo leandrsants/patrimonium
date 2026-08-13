@@ -16,6 +16,13 @@ import { formatBRL, formatDateBR } from "@/lib/format";
 import type { FormOptions } from "@/components/forms/options";
 import type { Oportunidade, Reuniao } from "@/lib/types";
 
+/** Remove o marcador de migração do legado, deixando só a anotação original. */
+function observacaoLimpa(obs: string | null): string | null {
+  if (!obs) return null;
+  const limpo = obs.replace(/\s*\[migrado do pipeline legado[^\]]*\]\s*$/i, "").trim();
+  return limpo || null;
+}
+
 const METODO_FILTROS = [
   { value: "", label: "Todos" },
   { value: "prospeccao_ativa", label: "Prospecção" },
@@ -23,6 +30,12 @@ const METODO_FILTROS = [
   { value: "organico", label: "Orgânico" },
   { value: "indicacao", label: "Indicação" },
 ];
+
+// Cor do ponto por etapa (segue o accent semântico do estágio).
+const DOT: Record<string, string> = {
+  neutral: "bg-ink-dim", vision: "bg-vision", smile: "bg-smile", extra: "bg-extra",
+  positive: "bg-positive", negative: "bg-negative", warning: "bg-warning",
+};
 
 export function PipelineBoard({
   oportunidades,
@@ -39,10 +52,10 @@ export function PipelineBoard({
   empresaId: string;
   showMetodoFilter?: boolean;
 }) {
-  const [view, setView] = useState("lista");
   const [busca, setBusca] = useState("");
   const [metodoFiltro, setMetodoFiltro] = useState("");
   const [selected, setSelected] = useState<Oportunidade | null>(null);
+  const hoje = new Date().toISOString().slice(0, 10);
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -59,7 +72,6 @@ export function PipelineBoard({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <SegmentedControl value={view} onChange={setView} options={[{ value: "lista", label: "Lista" }, { value: "pipeline", label: "Pipeline" }]} />
           {showMetodoFilter ? <SegmentedControl value={metodoFiltro} onChange={setMetodoFiltro} options={METODO_FILTROS} /> : null}
           <span className="text-2xs text-ink-dim">{abertas} em aberto · {filtradas.length} no total</span>
         </div>
@@ -77,42 +89,46 @@ export function PipelineBoard({
           description="Cadastre apenas leads com interesse real, que precisam de follow-up ou receberam orçamento."
           cta={<NovoLeadButton options={options} empresaId={empresaId} variant="primary" />}
         />
-      ) : view === "pipeline" ? (
+      ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {estagios.map((est) => {
             const cards = filtradas.filter((o) => o.estagio === est);
+            const encerrado = est === "fechado" || est === "perdido";
             return (
               <div key={est} className="rounded-xl2 border border-line bg-surface/40 p-2.5">
                 <div className="mb-2 flex items-center justify-between px-1">
-                  <span className="text-2xs font-medium text-ink-soft">{ESTAGIO_LABEL[est]}</span>
-                  <span className="text-2xs text-ink-dim">{cards.length}</span>
+                  <span className="flex items-center gap-1.5 text-2xs font-medium text-ink-soft">
+                    <span className={`h-1.5 w-1.5 rounded-full ${DOT[ESTAGIO_ACCENT[est] ?? "neutral"]}`} />
+                    {ESTAGIO_LABEL[est] ?? est}
+                  </span>
+                  <span className="rounded-full bg-surface-hover px-1.5 text-2xs text-ink-faint">{cards.length}</span>
                 </div>
                 <div className="space-y-2">
-                  {cards.map((o) => (
-                    <button key={o.id} onClick={() => setSelected(o)} className="block w-full rounded-lg2 border border-line bg-surface p-2.5 text-left transition-colors hover:border-line-strong">
-                      <p className="truncate text-xs font-medium text-ink">{o.nome_contato ?? o.cliente?.nome ?? "—"}</p>
-                      <p className="mt-0.5 truncate text-2xs text-ink-dim">{o.servico?.nome ?? "sem serviço"}</p>
-                    </button>
-                  ))}
+                  {cards.map((o) => {
+                    const valor = o.proposta_valor ?? o.valor_potencial;
+                    const follow = o.proxima_acao_data;
+                    const atrasado = !!follow && !encerrado && follow < hoje;
+                    return (
+                      <button key={o.id} onClick={() => setSelected(o)} className="block w-full rounded-lg2 border border-line bg-surface p-2.5 text-left transition-colors hover:border-line-strong">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <p className="truncate text-xs font-medium text-ink">{o.nome_contato ?? o.cliente?.nome ?? "—"}</p>
+                          {atrasado ? <span title="Follow-up atrasado" className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-negative" /> : null}
+                        </div>
+                        <p className="mt-0.5 truncate text-2xs text-ink-dim">{o.servico?.nome ?? "sem serviço"}</p>
+                        {valor || follow ? (
+                          <div className="mt-1.5 flex items-center justify-between gap-2 text-2xs">
+                            <span className="tnum text-ink-faint">{valor ? formatBRL(valor, { compact: true }) : ""}</span>
+                            {follow ? <span className={atrasado ? "text-negative" : "text-ink-dim"}>{formatDateBR(follow)}</span> : null}
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  {cards.length === 0 ? <p className="px-1 py-2 text-2xs text-ink-dim">—</p> : null}
                 </div>
               </div>
             );
           })}
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl2 border border-line">
-          {filtradas.map((o) => (
-            <button key={o.id} onClick={() => setSelected(o)} className="flex w-full items-center justify-between gap-4 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-white/[0.02]">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{o.nome_contato ?? o.cliente?.nome ?? "—"}</p>
-                <p className="truncate text-2xs text-ink-dim">{o.servico?.nome ?? "sem serviço"} · {o.canal?.nome ?? "sem origem"}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                {o.proxima_acao_data ? <span className="hidden text-2xs text-ink-faint sm:block">{formatDateBR(o.proxima_acao_data)}</span> : null}
-                <Badge accent={ESTAGIO_ACCENT[o.estagio] ?? "neutral"}>{ESTAGIO_LABEL[o.estagio] ?? o.estagio}</Badge>
-              </div>
-            </button>
-          ))}
         </div>
       )}
 
@@ -180,7 +196,7 @@ function LeadDrawer({
           <InfoRow label="Próximo follow-up" value={lead.proxima_acao_data ? formatDateBR(lead.proxima_acao_data) : "—"} />
           {lead.proposta_status ? <InfoRow label="Proposta" value={`${lead.proposta_valor ? formatBRL(lead.proposta_valor) : "—"} · ${lead.proposta_status}`} /> : null}
           {lead.motivo_perda ? <InfoRow label="Motivo da perda" value={lead.motivo_perda} /> : null}
-          {lead.observacao ? <InfoRow label="Observação" value={lead.observacao} /> : null}
+          {observacaoLimpa(lead.observacao) ? <InfoRow label="Observação" value={observacaoLimpa(lead.observacao)!} /> : null}
         </div>
 
         <div>

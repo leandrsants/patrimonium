@@ -1,5 +1,6 @@
 import type {
   Assinatura,
+  Cliente,
   CompraCartao,
   ContaSaldo,
   Empresa,
@@ -8,8 +9,8 @@ import type {
   RegistroProspeccao,
   Venda,
 } from "@/lib/types";
-import { inRange, type Period } from "@/lib/period";
-import { safeRatio } from "@/lib/format";
+import { inRange, previousPeriod, type Period } from "@/lib/period";
+import { safeRatio, formatBRL } from "@/lib/format";
 import { cac as calcCac, custoPorVenda as calcCPV, ticketMedio as calcTicket, ratio, somarProspeccao, type ProspeccaoAgregada } from "@/lib/calc";
 
 export type EmpresaMetrics = {
@@ -225,6 +226,131 @@ export function computeDashboard(
   };
 }
 
+/**
+ * Variação percentual de `atual` sobre `anterior`.
+ * - anterior 0 e atual 0  -> 0 (estável).
+ * - anterior 0 e atual ≠ 0 -> null (não há base: "novo").
+ * - caso geral -> (atual − anterior) / |anterior| × 100.
+ */
+export function pctDelta(atual: number, anterior: number): number | null {
+  if (anterior === 0) return atual === 0 ? 0 : null;
+  return ((atual - anterior) / Math.abs(anterior)) * 100;
+}
+
+export type FaturamentoPonto = {
+  label: string; // rótulo curto do eixo X
+  full: string; // data completa (tooltip) do período atual
+  atual: number;
+  anterior: number;
+  anteriorFull: string; // data completa do bucket correspondente do período anterior
+};
+
+type FatBucket = { label: string; full: string; value: number };
+
+/**
+ * Faturamento de uma empresa por bucket (dia ≤31d, semana ≤92d, mês acima) dentro
+ * do período. Faturamento = vendas (data_venda) + parcelas recorrentes vigentes,
+ * a mesma definição da métrica. Buckets vazios ficam zero para a linha não "pular".
+ */
+function faturamentoBuckets(
+  vendas: Venda[],
+  parcelas: ParcelaSituacao[],
+  assinaturas: Assinatura[],
+  empresaId: string,
+  period: Period,
+): FatBucket[] {
+  const DAY = 86400000;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const fromD = new Date(`${period.from}T00:00:00Z`);
+  const toD = new Date(`${period.to}T00:00:00Z`);
+  const dias = Math.round((toD.getTime() - fromD.getTime()) / DAY) + 1;
+  const gran: "day" | "week" | "month" = dias <= 31 ? "day" : dias <= 92 ? "week" : "month";
+
+  const buckets: { label: string; full: string }[] = [];
+  const index = new Map<string, number>();
+
+  if (gran === "month") {
+    let y = fromD.getUTCFullYear();
+    let m = fromD.getUTCMonth();
+    const endKey = `${toD.getUTCFullYear()}-${pad(toD.getUTCMonth() + 1)}`;
+    for (;;) {
+      const key = `${y}-${pad(m + 1)}`;
+      index.set(key, buckets.length);
+      buckets.push({ label: MES[m], full: `${MES[m]}/${y}` });
+      if (key === endKey) break;
+      m += 1;
+      if (m > 11) { m = 0; y += 1; }
+    }
+  } else {
+    const step = gran === "week" ? 7 : 1;
+    for (let t = fromD.getTime(); t <= toD.getTime(); t += step * DAY) {
+      const d = new Date(t);
+      const key = d.toISOString().slice(0, 10);
+      const dd = pad(d.getUTCDate());
+      const mm = pad(d.getUTCMonth() + 1);
+      index.set(key, buckets.length);
+      buckets.push({
+        label: gran === "week" ? `${dd}/${mm}` : `${d.getUTCDate()}`,
+        full: gran === "week" ? `Semana de ${dd}/${mm}` : `${dd}/${mm}/${d.getUTCFullYear()}`,
+      });
+    }
+  }
+
+  const keyFor = (ymd: string | null | undefined): string | null => {
+    if (!ymd) return null;
+    const d = new Date(`${ymd.slice(0, 10)}T00:00:00Z`);
+    if (d.getTime() < fromD.getTime() || d.getTime() > toD.getTime()) return null;
+    if (gran === "month") return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+    if (gran === "day") return d.toISOString().slice(0, 10);
+    const offset = Math.floor((d.getTime() - fromD.getTime()) / DAY);
+    return new Date(fromD.getTime() + Math.floor(offset / 7) * 7 * DAY).toISOString().slice(0, 10);
+  };
+
+  const vals = new Array(buckets.length).fill(0);
+  const add = (ymd: string | null | undefined, v: number) => {
+    const k = keyFor(ymd);
+    if (k === null) return;
+    const i = index.get(k);
+    if (i !== undefined) vals[i] += v;
+  };
+
+  for (const v of vendas) {
+    if (v.empresa_id !== empresaId) continue;
+    add(v.data_venda, Number(v.valor_final));
+  }
+  const assinaturaIds = new Set(assinaturas.filter((a) => a.empresa_id === empresaId).map((a) => a.id));
+  for (const p of parcelas) {
+    if (!p.assinatura_id || !assinaturaIds.has(p.assinatura_id) || p.situacao_calculada === "cancelada") continue;
+    add(p.data_vencimento, Number(p.valor_devido));
+  }
+
+  return buckets.map((b, i) => ({ label: b.label, full: b.full, value: vals[i] }));
+}
+
+/**
+ * Série de Faturamento do período atual + do período anterior de mesma duração
+ * (alinhados por posição de bucket), para o gráfico da Vision. Usa a mesma
+ * `previousPeriod` dos cards do Dashboard.
+ */
+export function buildVisionFaturamentoSerie(
+  vendas: Venda[],
+  parcelas: ParcelaSituacao[],
+  assinaturas: Assinatura[],
+  empresaId: string,
+  period: Period,
+): FaturamentoPonto[] {
+  const atual = faturamentoBuckets(vendas, parcelas, assinaturas, empresaId, period);
+  const anterior = faturamentoBuckets(vendas, parcelas, assinaturas, empresaId, previousPeriod(period));
+  return atual.map((b, i) => ({
+    label: b.label,
+    full: b.full,
+    atual: b.value,
+    anterior: anterior[i]?.value ?? 0,
+    anteriorFull: anterior[i]?.full ?? "",
+  }));
+}
+
 export type AttentionItem = { tone: "negative" | "warning" | "neutral"; label: string; detail?: string; href?: string };
 
 export function computeAttention(data: {
@@ -418,6 +544,69 @@ export function buildAquisicaoPorMetodo(
 
 export function somarRegistrosProspeccao(registros: RegistroProspeccao[], empresaId: string, period: Period): ProspeccaoAgregada {
   return somarProspeccao(registros.filter((r) => r.empresa_id === empresaId && inRange(r.data, period)));
+}
+
+/** Dias corridos entre duas datas "YYYY-MM-DD" (UTC, livre de fuso). */
+function diasEntre(de: string, ate: string): number {
+  const a = Date.parse(`${de.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${ate.slice(0, 10)}T00:00:00Z`);
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
+export type AtencaoItem = { tone: "negative" | "warning" | "neutral"; label: string };
+
+/**
+ * Pendências da empresa que pedem ação HOJE: cobranças atrasadas (parcelas de
+ * vendas da empresa), follow-ups vencidos e entregas paradas há muito tempo.
+ */
+export function buildEmpresaAtencao(
+  vendas: Venda[],
+  parcelas: ParcelaSituacao[],
+  oportunidades: { proxima_acao_data: string | null; estagio: string }[],
+  hoje: string,
+): AtencaoItem[] {
+  const items: AtencaoItem[] = [];
+  const vendaIds = new Set(vendas.map((v) => v.id));
+
+  const atrasadas = parcelas.filter((p) => p.venda_id && vendaIds.has(p.venda_id) && p.situacao_calculada === "atrasada");
+  if (atrasadas.length) {
+    const total = atrasadas.reduce((s, p) => s + Number(p.saldo_pendente), 0);
+    items.push({ tone: "negative", label: `${atrasadas.length} cobrança(s) atrasada(s) · ${formatBRL(total)}` });
+  }
+
+  const follow = oportunidades.filter((o) => o.proxima_acao_data && o.proxima_acao_data < hoje && o.estagio !== "fechado" && o.estagio !== "perdido").length;
+  if (follow) items.push({ tone: "warning", label: `${follow} follow-up(s) de lead vencido(s)` });
+
+  const paradas = vendas.filter((v) => v.status_entrega && v.status_entrega !== "entregue" && v.status_entrega !== "finalizado" && diasEntre(v.data_venda, hoje) > 14);
+  if (paradas.length) items.push({ tone: "neutral", label: `${paradas.length} entrega(s) parada(s) há +14 dias` });
+
+  return items;
+}
+
+/**
+ * LTV histórico por canal de aquisição: agrupa cada cliente REAL pelo método da
+ * sua PRIMEIRA venda e divide o faturamento vitalício total pelo nº de clientes.
+ */
+export function ltvPorMetodo(vendas: Venda[], clientes: Cliente[]): Record<string, { ltv: number | null; clientes: number }> {
+  const reais = new Set(clientes.filter((c) => c.tipo_registro === "normal").map((c) => c.id));
+  const primeiro = new Map<string, { data: string; metodo: string }>();
+  const totalCliente = new Map<string, number>();
+  for (const v of vendas) {
+    if (!v.cliente_id || !reais.has(v.cliente_id)) continue;
+    totalCliente.set(v.cliente_id, (totalCliente.get(v.cliente_id) ?? 0) + Number(v.valor_final));
+    const cur = primeiro.get(v.cliente_id);
+    if (!cur || v.data_venda < cur.data) primeiro.set(v.cliente_id, { data: v.data_venda, metodo: v.metodo_aquisicao ?? "outros" });
+  }
+  const agg: Record<string, { soma: number; n: number }> = {};
+  for (const [id, p] of primeiro) {
+    const m = p.metodo || "outros";
+    (agg[m] ??= { soma: 0, n: 0 });
+    agg[m].soma += totalCliente.get(id) ?? 0;
+    agg[m].n += 1;
+  }
+  const out: Record<string, { ltv: number | null; clientes: number }> = {};
+  for (const [m, a] of Object.entries(agg)) out[m] = { ltv: a.n > 0 ? a.soma / a.n : null, clientes: a.n };
+  return out;
 }
 
 /** Ticket médio por produto (empresarial). */

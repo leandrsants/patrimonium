@@ -58,7 +58,7 @@ export function GlobalAdd({ options }: { options: FormOptions }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg2 bg-ink px-3.5 text-sm font-medium text-canvas transition-colors hover:bg-white"
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg2 bg-ink px-3.5 text-sm font-medium text-canvas transition-colors hover:bg-primary-hover"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -75,7 +75,7 @@ export function GlobalAdd({ options }: { options: FormOptions }) {
                 onClick={() => setAction(m.key)}
                 className="flex w-full items-center gap-3 rounded-lg2 border border-line bg-surface-input px-4 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-hover"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg2 bg-white/[0.05] text-sm text-ink-soft">{m.icon}</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg2 bg-line-strong text-sm text-ink-soft">{m.icon}</span>
                 <span>
                   <span className="block text-sm font-medium text-ink">{m.label}</span>
                   <span className="block text-2xs text-ink-faint">{m.desc}</span>

@@ -9,7 +9,7 @@ import { formatBRL, formatDateBR } from "@/lib/format";
 import { resolvePeriod, inRange } from "@/lib/period";
 import { getLancamentos, getCategorias, getFormOptions } from "@/lib/data";
 
-const CORES = ["#9b7ad6", "#cda349", "#3d8bfd", "#3ecf8e", "#e0a64d"];
+const CORES = ["rgb(var(--extra))", "rgb(var(--vision))", "rgb(var(--smile))", "rgb(var(--positive))", "rgb(var(--warning))"];
 
 export default async function ExtrasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
@@ -28,7 +28,7 @@ export default async function ExtrasPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Receitas extras" title="Extras" subtitle="Sonati, Trium, presentes, projetos por fora" accent="neutral" actions={<div className="flex gap-2"><PeriodFilter current={period.kind} /><NovaReceitaButton options={options} /></div>} />
+      <PageHeader eyebrow="Receitas extras" title="Extras" subtitle="Sonati, Trium, presentes, projetos por fora" accent="neutral" actions={<div className="flex gap-2"><PeriodFilter period={period} /><NovaReceitaButton options={options} /></div>} />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Metric label="Recebido no período" value={formatBRL(recebidoPeriodo)} accent="extra" size="lg" />
@@ -57,7 +57,7 @@ export default async function ExtrasPage({ searchParams }: { searchParams: Promi
           <div className="overflow-x-auto rounded-xl2 border border-line">
             <table className="w-full min-w-[520px] text-sm">
               <thead>
-                <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+                <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                   <th className="px-4 py-3 text-left font-semibold">Data</th>
                   <th className="px-4 py-3 text-left font-semibold">Categoria</th>
                   <th className="px-4 py-3 text-left font-semibold">Descrição</th>

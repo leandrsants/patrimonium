@@ -35,7 +35,7 @@ export function Drawer({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 animate-fade-in bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 animate-fade-in bg-overlay/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative flex h-full w-full max-w-md animate-slide-in flex-col border-l border-line bg-surface shadow-drawer">
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
           <div>
@@ -45,7 +45,7 @@ export function Drawer({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="rounded-lg2 p-1.5 text-ink-faint transition-colors hover:bg-white/[0.05] hover:text-ink"
+            className="rounded-lg2 p-1.5 text-ink-faint transition-colors hover:bg-surface-hover hover:text-ink"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

@@ -1,18 +1,49 @@
 import { Badge } from "@/components/ui/primitives";
+import { SplitBar } from "@/components/charts/BarChart";
 import { formatBRL } from "@/lib/format";
 import { ratio } from "@/lib/calc";
 import type { ProdutoBreakdown } from "@/lib/metrics";
 import type { ProdutoServico } from "@/lib/types";
 
-/** Faturamento, vendas e ticket por produto + catálogo (ativos e inativos preparados). */
-export function ProdutosMetricasPanel({ breakdown, produtos }: { breakdown: ProdutoBreakdown[]; produtos: ProdutoServico[] }) {
+const PALETTE = ["rgb(var(--vision))", "rgb(var(--smile))", "rgb(var(--extra))", "rgb(var(--positive))", "rgb(var(--warning))"];
+
+/** Faturamento, vendas e ticket por produto + mix visual + catálogo. */
+export function ProdutosMetricasPanel({
+  breakdown,
+  produtos,
+  legado,
+}: {
+  breakdown: ProdutoBreakdown[];
+  produtos: ProdutoServico[];
+  legado?: { count: number; valor: number };
+}) {
   const inativos = produtos.filter((p) => !p.ativo);
+
+  const mixParts = [
+    ...breakdown.filter((b) => b.valor > 0).map((b, i) => ({ label: b.nome, value: b.valor, color: PALETTE[i % PALETTE.length] })),
+    ...(legado && legado.valor > 0 ? [{ label: "Sem produto real", value: legado.valor, color: "rgb(var(--ink-dim))" }] : []),
+  ];
+
   return (
     <div className="space-y-5">
+      {legado && legado.count > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl2 border border-warning/20 bg-warning/[0.03] px-4 py-3 text-2xs text-ink-soft">
+          <Badge accent="warning">{legado.count} sem produto real</Badge>
+          <span>Vendas ainda em “Venda avulsa — legado” ({formatBRL(legado.valor)}). Reclassifique na aba Vendas para o faturamento por produto ficar completo.</span>
+        </div>
+      ) : null}
+
+      {mixParts.length > 0 ? (
+        <div className="rounded-xl2 border border-line bg-surface p-5 shadow-panel">
+          <p className="mb-3 text-2xs font-semibold uppercase tracking-wide text-ink-faint">Mix de faturamento no período</p>
+          <SplitBar parts={mixParts} />
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto rounded-xl2 border border-line">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
-            <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
               <th className="px-4 py-3 text-left font-semibold">Produto</th>
               <th className="px-4 py-3 text-right font-semibold">Vendas</th>
               <th className="px-4 py-3 text-right font-semibold">Faturamento</th>

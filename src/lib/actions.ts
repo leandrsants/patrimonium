@@ -251,9 +251,28 @@ export async function criarVenda(input: {
   metodo_aquisicao?: string;
   status_entrega?: string;
   observacao?: string;
+  /**
+   * "recebido" (padrão): venda já efetuada — parcela única quitada no ato, sem
+   * cobrança em aberto nem alerta de atraso. "a_receber": gera as parcelas da
+   * condição de pagamento e deixa a cobrança pendente para registrar depois.
+   */
+  pagamento?: "recebido" | "a_receber";
+  /** Conta que recebeu, quando pagamento = "recebido". Default: primeira conta ativa. */
+  conta_id?: string;
 }): Promise<ActionResult> {
   try {
     const c = await client();
+    const recebido = (input.pagamento ?? "recebido") === "recebido";
+
+    // Sem conta não há onde lançar o recebimento — falha ANTES de criar a venda,
+    // para não deixar venda meio registrada.
+    let contaId = input.conta_id || null;
+    if (recebido && input.valor_final > 0 && !contaId) {
+      const { data: conta } = await c.from("contas").select("id").eq("ativa", true).order("criado_em").limit(1).maybeSingle();
+      if (!conta) return { ok: false, error: "Cadastre uma conta em Financeiro → Contas para registrar a venda como recebida." };
+      contaId = conta.id;
+    }
+
     const { data: venda, error } = await c
       .from("vendas")
       .insert({
@@ -272,24 +291,51 @@ export async function criarVenda(input: {
         fonte: input.fonte || null,
         registro_prospeccao_id: input.registro_prospeccao_id || null,
         oportunidade_id: input.oportunidade_id || null,
-        status_entrega: input.status_entrega || "aguardando_pagamento",
+        status_entrega: input.status_entrega || (recebido ? "entregue" : "aguardando_pagamento"),
         observacao: input.observacao || null,
       })
       .select("id")
       .single();
     if (error) throw error;
 
-    const parcelas = parcelasFromRegra(input.condicao_pagamento, input.valor_final, input.data_venda);
-    const { error: pErr } = await c.from("parcelas").insert(
-      parcelas.map((p) => ({
-        venda_id: venda.id,
-        numero: p.numero,
-        descricao: p.descricao,
-        valor_devido: p.valor,
-        data_vencimento: p.venc,
-      })),
-    );
+    // Venda já efetuada = uma única parcela integral, quitada no ato. Só quando a
+    // cobrança fica em aberto é que a condição de pagamento vira cronograma.
+    const parcelas = recebido
+      ? [{ descricao: "Pagamento integral", valor: input.valor_final, venc: input.data_venda, numero: 1 }]
+      : parcelasFromRegra(input.condicao_pagamento, input.valor_final, input.data_venda);
+    const { data: criadas, error: pErr } = await c
+      .from("parcelas")
+      .insert(
+        parcelas.map((p) => ({
+          venda_id: venda.id,
+          numero: p.numero,
+          descricao: p.descricao,
+          valor_devido: p.valor,
+          data_vencimento: p.venc,
+        })),
+      )
+      .select("id");
     if (pErr) throw pErr;
+
+    // Lançamento do recebimento: o trigger de parcelas marca a parcela como paga,
+    // então a venda não aparece como atrasada nem pendente.
+    if (recebido && input.valor_final > 0 && contaId && criadas?.[0]) {
+      const { error: lErr } = await c.from("lancamentos_financeiros").insert({
+        tipo: "entrada",
+        natureza: "receita_empresarial",
+        empresa_id: input.empresa_id,
+        cliente_id: input.cliente_id || null,
+        venda_id: venda.id,
+        parcela_id: criadas[0].id,
+        conta_id: contaId,
+        valor: input.valor_final,
+        data_competencia: input.data_venda,
+        data_pagamento: input.data_venda,
+        status: "recebido",
+        idempotency_key: randomUUID(),
+      });
+      if (lErr) throw lErr;
+    }
 
     if (input.oportunidade_id) {
       await c.from("oportunidades").update({ venda_id: venda.id, estagio: "fechado" }).eq("id", input.oportunidade_id);
@@ -318,6 +364,9 @@ export async function converterOportunidadeEmVenda(oportunidadeId: string, input
   canal_id?: string;         // override opcional; default = do lead
   fonte?: string;            // override opcional; default = do lead
   observacao?: string;
+  pagamento?: "recebido" | "a_receber";
+  conta_id?: string;
+  status_entrega?: string;
 }): Promise<ActionResult> {
   try {
     const c = await client();
@@ -344,6 +393,9 @@ export async function converterOportunidadeEmVenda(oportunidadeId: string, input
       registro_prospeccao_id: opp.registro_prospeccao_id ?? undefined,
       oportunidade_id: oportunidadeId,
       observacao: input.observacao,
+      pagamento: input.pagamento,
+      conta_id: input.conta_id,
+      status_entrega: input.status_entrega,
     });
   } catch (e) {
     return fail(e);
@@ -430,6 +482,26 @@ export async function atualizarStatusEntrega(vendaId: string, status: string): P
   try {
     const c = await client();
     const { error } = await c.from("vendas").update({ status_entrega: status }).eq("id", vendaId);
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Edita dados de catálogo de uma venda já registrada: o produto (para reclassificar
+ * qual trabalho foi — alimenta o faturamento por produto) e a descrição/observação.
+ * Não mexe em valores, parcelas ou pagamentos.
+ */
+export async function atualizarVenda(
+  vendaId: string,
+  patch: { produto_id?: string | null; observacao?: string | null },
+): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { error } = await c.from("vendas").update(patch).eq("id", vendaId);
     if (error) throw error;
     revalidateAll();
     return { ok: true };
@@ -706,6 +778,139 @@ export async function criarTransferencia(input: {
     if (error) throw error;
     revalidateAll();
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Cancela um lancamento: ele continua na tabela, mas sai de todo calculo
+ * (metrics.ts so soma status 'pago'/'recebido'). E o caminho normal para um
+ * movimento que existiu de verdade e caiu -- devolucao, cobranca perdoada,
+ * despesa que nao rolou.
+ */
+export async function cancelarLancamento(id: string, motivo?: string): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { data: antes, error: readErr } = await c
+      .from("lancamentos_financeiros")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (readErr) throw readErr;
+    if (antes.status === "cancelado") return { ok: true, id };
+
+    const observacao = motivo?.trim()
+      ? `${antes.observacao ? `${antes.observacao} — ` : ""}cancelado: ${motivo.trim()}`
+      : antes.observacao;
+
+    const { data: depois, error } = await c
+      .from("lancamentos_financeiros")
+      .update({ status: "cancelado", observacao, atualizado_em: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    await c.from("auditoria").insert({
+      tabela: "lancamentos_financeiros",
+      registro_id: id,
+      acao: "delete_logico",
+      dados_antes: antes,
+      dados_depois: depois,
+      origem: "app",
+    });
+
+    revalidateAll();
+    return { ok: true, id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Reverte um cancelamento, devolvendo o lancamento ao status quitado. */
+export async function reativarLancamento(id: string): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { data: antes, error: readErr } = await c
+      .from("lancamentos_financeiros")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (readErr) throw readErr;
+
+    const status = antes.data_pagamento
+      ? antes.tipo === "entrada"
+        ? "recebido"
+        : "pago"
+      : "previsto";
+
+    const { data: depois, error } = await c
+      .from("lancamentos_financeiros")
+      .update({ status, atualizado_em: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    await c.from("auditoria").insert({
+      tabela: "lancamentos_financeiros",
+      registro_id: id,
+      acao: "update",
+      dados_antes: antes,
+      dados_depois: depois,
+      origem: "app",
+    });
+
+    revalidateAll();
+    return { ok: true, id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Apaga o lancamento de vez. Use so para linha que nunca deveria ter existido
+ * (duplicidade, valor digitado errado) -- para o resto, cancelarLancamento.
+ *
+ * O registro inteiro vai para public.auditoria antes do delete, entao a linha
+ * some da tabela mas nao do historico. Se o lancamento estiver preso a uma
+ * parcela, o trigger trg_atualizar_status_parcela recalcula o status dela.
+ */
+export async function excluirLancamento(id: string): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { data: antes, error: readErr } = await c
+      .from("lancamentos_financeiros")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (readErr) throw readErr;
+
+    // Grava a auditoria ANTES: se o delete falhar (FK de estorno, por exemplo),
+    // sobra um registro a mais no log -- prejuizo menor do que apagar sem rastro.
+    const { error: audErr } = await c.from("auditoria").insert({
+      tabela: "lancamentos_financeiros",
+      registro_id: id,
+      acao: "delete_fisico",
+      dados_antes: antes,
+      dados_depois: null,
+      origem: "app",
+    });
+    if (audErr) throw audErr;
+
+    const { error } = await c.from("lancamentos_financeiros").delete().eq("id", id);
+    if (error) {
+      if (error.code === "23503") {
+        throw new Error(
+          "Este lançamento tem um estorno vinculado. Exclua o estorno primeiro ou apenas cancele este lançamento.",
+        );
+      }
+      throw error;
+    }
+
+    revalidateAll();
+    return { ok: true, id };
   } catch (e) {
     return fail(e);
   }

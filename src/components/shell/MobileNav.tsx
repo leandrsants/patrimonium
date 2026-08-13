@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "@/lib/nav";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -11,11 +12,11 @@ export function MobileNav() {
       <div className="flex items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-vision to-smile">
-            <span className="text-2xs font-bold text-canvas">P</span>
+            <span className="text-2xs font-bold text-on-accent">P</span>
           </div>
           <span className="text-sm font-semibold text-ink">Patrimonium</span>
         </Link>
-        <span className="text-2xs text-ink-dim">v0.2</span>
+        <ThemeToggle />
       </div>
       <div className="flex gap-1 overflow-x-auto px-3 pb-3">
         {NAV_ITEMS.map((item) => {

@@ -134,7 +134,7 @@ export function ProspeccaoAtivaPanel({
             <div className="overflow-x-auto rounded-xl2 border border-line">
               <table className="w-full min-w-[440px] text-sm">
                 <thead>
-                  <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+                  <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                     <th className="px-4 py-2.5 text-left font-semibold"></th>
                     <th className="px-4 py-2.5 text-right font-semibold">Hoje</th>
                     <th className="px-4 py-2.5 text-right font-semibold">Semana</th>
@@ -155,7 +155,7 @@ export function ProspeccaoAtivaPanel({
                     ["Taxa de interesse", (b: ProdBucket) => taxaInteresse(b.positivas, b.respostas)],
                     ["Taxa de agendamento", (b: ProdBucket) => taxaAgendamento(b.reunioes, b.positivas)],
                   ] as const).map(([label, fn]) => (
-                    <tr key={label} className="border-b border-line/70 last:border-0 bg-white/[0.008]">
+                    <tr key={label} className="border-b border-line/70 last:border-0 bg-surface-raised">
                       <td className="px-4 py-2.5 text-2xs uppercase tracking-wide text-ink-dim">{label}</td>
                       <td className="px-4 py-2.5 text-right tnum text-ink-soft">{pctOrDash(fn(prod.hoje))}</td>
                       <td className="px-4 py-2.5 text-right tnum text-ink-faint">{pctOrDash(fn(prod.semana))}</td>
@@ -173,7 +173,7 @@ export function ProspeccaoAtivaPanel({
             {canais.length === 0 ? <p className="text-sm text-ink-faint">Sem canal registrado.</p> : (
               <div className="overflow-x-auto rounded-xl2 border border-line">
                 <table className="w-full min-w-[640px] text-sm">
-                  <thead><tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+                  <thead><tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                     <th className="px-3 py-2.5 text-left font-semibold">Canal</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Abordagens</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Resposta</th>
@@ -203,7 +203,7 @@ export function ProspeccaoAtivaPanel({
             <PanelHeader title="Histórico de prospecção" description="Registros do período · editável · contratos derivados (não digitados)" />
             <div className="overflow-x-auto rounded-xl2 border border-line">
               <table className="w-full min-w-[680px] text-sm">
-                <thead><tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+                <thead><tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
                   <th className="px-3 py-2.5 text-left font-semibold">Data</th><th className="px-3 py-2.5 text-left font-semibold">Canal</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Abord.</th><th className="px-3 py-2.5 text-right font-semibold">Resp.</th><th className="px-3 py-2.5 text-right font-semibold">Pos.</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Agend.</th><th className="px-3 py-2.5 text-right font-semibold">Realiz.</th><th className="px-3 py-2.5 text-right font-semibold">Prop.</th>

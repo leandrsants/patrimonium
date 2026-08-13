@@ -50,7 +50,7 @@ export function ClientesPanel({ rows }: { rows: ClienteRow[] }) {
       <div className="overflow-x-auto rounded-xl2 border border-line">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b border-line bg-white/[0.015] text-2xs uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-line bg-surface-raised text-2xs uppercase tracking-wider text-ink-faint">
               <th className="px-4 py-3 text-left font-semibold">Cliente</th>
               <th className="px-4 py-3 text-left font-semibold">Produtos</th>
               <th className="px-4 py-3 text-right font-semibold">Vendido</th>
@@ -61,7 +61,7 @@ export function ClientesPanel({ rows }: { rows: ClienteRow[] }) {
           </thead>
           <tbody>
             {filtradas.map((r) => (
-              <tr key={r.id} className="border-b border-line/70 transition-colors last:border-0 hover:bg-white/[0.02]">
+              <tr key={r.id} className="border-b border-line/70 transition-colors last:border-0 hover:bg-surface-hover">
                 <td className="px-4 py-3">
                   <Link href={`/clientes/${r.id}`} className="block">
                     <span className="block font-medium text-ink hover:text-vision">{r.nome}</span>
