@@ -477,21 +477,24 @@ export function computeAttention(data: {
 }
 
 /** Série mês a mês do ano corrente: faturamento (vendas), despesas e lucro empresarial. */
+/**
+ * Série mensal do gráfico do painel, toda em regime de COMPETÊNCIA: o mês é o
+ * da venda e o lucro é faturamento − despesas.
+ *
+ * Antes o lucro saía de `recebido − despesas`, ou seja, a 1ª barra media venda
+ * e a 3ª media caixa. As duas coincidiam enquanto todo cliente pagava à vista e
+ * divergiram no primeiro caloteiro (julho: 914,90 − 348,81 = 566,09, mas a
+ * barra mostrava 518,09 — os 48,00 que o Leo - Açaí não pagou).
+ *
+ * O preço dessa escolha: venda não recebida entra no lucro. Quem quiser caixa
+ * olha o saldo das contas, que é outra coisa e vive em patrimonio_saldos.
+ */
 export function monthlySeries(vendas: Venda[], lancamentos: Lancamento[], year: number) {
   const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   return meses.map((label, m) => {
     const fat = vendas
-      .filter((v) => v.data_venda.startsWith(`${year}-${String(m + 1).padStart(2, "0")}`))
+      .filter((v) => v.status === "ativa" && v.data_venda.startsWith(`${year}-${String(m + 1).padStart(2, "0")}`))
       .reduce((s, v) => s + Number(v.valor_final), 0);
-    const receb = lancamentos
-      .filter(
-        (l) =>
-          l.tipo === "entrada" &&
-          l.natureza === "receita_empresarial" &&
-          l.status === "recebido" &&
-          (l.data_pagamento ?? "").startsWith(`${year}-${String(m + 1).padStart(2, "0")}`),
-      )
-      .reduce((s, l) => s + Number(l.valor), 0);
     const desp = lancamentos
       .filter(
         (l) =>
@@ -501,7 +504,7 @@ export function monthlySeries(vendas: Venda[], lancamentos: Lancamento[], year: 
           (l.data_pagamento ?? l.data_competencia).startsWith(`${year}-${String(m + 1).padStart(2, "0")}`),
       )
       .reduce((s, l) => s + Number(l.valor), 0);
-    return { label, values: [fat, desp, receb - desp] };
+    return { label, values: [fat, desp, fat - desp] };
   });
 }
 

@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
-          <PanelHeader title="Faturamento, despesas e lucro" description={`Mês a mês · ${new Date().getFullYear()}`} />
+          <PanelHeader title="Faturamento, despesas e lucro" description={`Mês a mês · ${new Date().getFullYear()} · pela data da venda, não do pagamento`} />
           <FluxoChart
             groups={chart}
             series={[
