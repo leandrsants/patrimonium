@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { PeriodFilter } from "@/components/shell/PeriodFilter";
 import { Metric, MiniMetric, Panel, PanelHeader, Progress, Badge, LinkCard } from "@/components/ui/primitives";
 import { BarChart, SplitBar } from "@/components/charts/BarChart";
+import { MetaPaceChart } from "@/components/charts/MetaPaceChart";
 import { formatBRL, formatDateBR, formatPercent } from "@/lib/format";
 import { resolvePeriod, previousPeriod, daysUntil } from "@/lib/period";
-import { computeDashboard, computeAttention, monthlySeries, pctDelta } from "@/lib/metrics";
+import { computeDashboard, computeAttention, monthlySeries, buildMetaSerie, pctDelta } from "@/lib/metrics";
 import {
   getEmpresas, getLancamentos, getVendas, getParcelasSituacao, getAssinaturas,
   getContasSaldos, getComprasCartao, getOportunidades, getMetaAtiva, getMetaConfirmado,
@@ -27,6 +28,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const mAnt = computeDashboard({ empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras }, periodoAnterior);
   const attention = computeAttention({ parcelas, assinaturas, vendas, oportunidades });
   const chart = monthlySeries(vendas, lancamentos, new Date().getFullYear());
+  const metaSerie = meta ? buildMetaSerie(lancamentos, meta) : [];
 
   const metaPct = meta ? Math.min(100, (metaConfirmado / Number(meta.valor_alvo)) * 100) : 0;
   const metaFalta = meta ? Math.max(0, Number(meta.valor_alvo) - metaConfirmado) : 0;
@@ -85,6 +87,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* Gráficos */}
+      {meta && metaSerie.length > 1 ? (
+        <Panel>
+          <PanelHeader
+            title="Ritmo da meta"
+            description="Recebido acumulado contra o ritmo necessário para fechar no prazo"
+          />
+          <MetaPaceChart serie={metaSerie} alvo={Number(meta.valor_alvo)} />
+        </Panel>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
           <PanelHeader title="Faturamento, despesas e lucro" description={`Mês a mês · ${new Date().getFullYear()}`} />

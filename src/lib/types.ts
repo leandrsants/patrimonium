@@ -240,7 +240,8 @@ export type Lancamento = {
   entra_no_cac: boolean;
   metodo_aquisicao: string | null;
   observacao: string | null;
-  categoria?: { nome: string } | null;
+  /** `conta_na_meta` marca categorias de receita extra que contam na Meta 10K. */
+  categoria?: { nome: string; conta_na_meta?: boolean } | null;
   cliente?: { nome: string } | null;
   conta?: { nome: string } | null;
 };

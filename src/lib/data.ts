@@ -185,7 +185,7 @@ export async function getLancamentos(): Promise<Lancamento[]> {
   // conta_id e conta_destino_id são ambas FK para contas -> desambiguar o embed pela coluna.
   const { data } = await c
     .from("lancamentos_financeiros")
-    .select("*, categoria:categorias_financeiras(nome), cliente:clientes(nome), conta:conta_id(nome)")
+    .select("*, categoria:categorias_financeiras(nome, conta_na_meta), cliente:clientes(nome), conta:conta_id(nome)")
     .order("data_competencia", { ascending: false });
   return (data as Lancamento[]) ?? [];
 }

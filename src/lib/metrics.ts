@@ -5,12 +5,13 @@ import type {
   ContaSaldo,
   Empresa,
   Lancamento,
+  Meta,
   ParcelaSituacao,
   RegistroProspeccao,
   Venda,
 } from "@/lib/types";
 import { inRange, previousPeriod, type Period } from "@/lib/period";
-import { safeRatio, formatBRL } from "@/lib/format";
+import { safeRatio, formatBRL, formatDateBR } from "@/lib/format";
 import { cac as calcCac, custoPorVenda as calcCPV, ticketMedio as calcTicket, ratio, somarProspeccao, type ProspeccaoAgregada } from "@/lib/calc";
 
 export type EmpresaMetrics = {
@@ -235,6 +236,77 @@ export function computeDashboard(
 export function pctDelta(atual: number, anterior: number): number | null {
   if (anterior === 0) return atual === 0 ? 0 : null;
   return ((atual - anterior) / Math.abs(anterior)) * 100;
+}
+
+export type MetaPonto = {
+  label: string; // rótulo curto do eixo X (dd/mm)
+  full: string; // data completa (tooltip)
+  /** Posição no eixo X como fração 0–1 do período da meta, não do índice: os
+   *  marcos não são equidistantes (hoje e o último dia entram fora da grade
+   *  semanal), então espaçar por índice mentiria sobre o tempo. */
+  pos: number;
+  /** Recebido acumulado até a data. `null` depois de hoje — a linha real para no presente. */
+  acumulado: number | null;
+  /** Onde o acumulado precisaria estar nessa data para a meta fechar no prazo. */
+  ritmo: number;
+};
+
+/**
+ * Série semanal do progresso da Meta 10K: quanto já entrou acumulado contra o
+ * ritmo necessário para fechar no prazo (reta de 0 ao alvo entre início e fim).
+ *
+ * O filtro reproduz `meta_10k_progresso` (20260812110000): entrada recebida,
+ * de receita empresarial OU de receita extra cuja categoria esteja marcada com
+ * `conta_na_meta` — hoje só Sonati/Sonate. Datas são comparadas como string
+ * ISO, que ordena corretamente e evita fuso.
+ */
+export function buildMetaSerie(lancamentos: Lancamento[], meta: Meta, hojeISO?: string): MetaPonto[] {
+  const inicio = meta.data_inicio;
+  const fim = meta.data_fim;
+  const hoje = hojeISO ?? new Date().toISOString().slice(0, 10);
+  const alvo = Number(meta.valor_alvo);
+
+  const contam = lancamentos
+    .filter(
+      (l) =>
+        l.tipo === "entrada" &&
+        l.status === "recebido" &&
+        (l.natureza === "receita_empresarial" ||
+          (l.natureza === "receita_extra" && l.categoria?.conta_na_meta === true)) &&
+        l.data_pagamento !== null &&
+        l.data_pagamento >= inicio &&
+        l.data_pagamento <= fim,
+    )
+    .sort((a, b) => (a.data_pagamento! < b.data_pagamento! ? -1 : 1));
+
+  const dia = 86_400_000;
+  const t0 = Date.parse(`${inicio}T00:00:00Z`);
+  const t1 = Date.parse(`${fim}T00:00:00Z`);
+  const totalDias = Math.max(1, Math.round((t1 - t0) / dia));
+
+  // Marcos semanais, mais início, fim e HOJE. Sem o marco de hoje a linha real
+  // pararia no último domingo e ignoraria o que entrou na semana corrente.
+  const marcos = new Set<string>();
+  for (let t = t0; t < t1; t += 7 * dia) marcos.add(new Date(t).toISOString().slice(0, 10));
+  marcos.add(fim);
+  if (hoje > inicio && hoje < fim) marcos.add(hoje);
+
+  let i = 0;
+  let soma = 0;
+  return [...marcos]
+    .sort()
+    .map((data) => {
+      while (i < contam.length && contam[i].data_pagamento! <= data) soma += Number(contam[i++].valor);
+      const decorridos = Math.round((Date.parse(`${data}T00:00:00Z`) - t0) / dia);
+      const [, mes, d] = data.split("-");
+      return {
+        label: `${d}/${mes}`,
+        full: formatDateBR(data),
+        pos: decorridos / totalDias,
+        acumulado: data <= hoje ? soma : null,
+        ritmo: (alvo * decorridos) / totalDias,
+      };
+    });
 }
 
 export type FaturamentoPonto = {

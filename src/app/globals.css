@@ -33,6 +33,12 @@
   --vision-soft: 224 197 131;
   --vision-dim: 42 38 29;
 
+  /* Linha-guia de gráfico (meta, projeção). Cinza que se separa do --vision
+     tanto na visão normal quanto em daltonismo — validado por tema, por isso
+     não acompanha um token de ink existente: no escuro o cinza precisa ser
+     mais fundo que --ink-soft para não colidir com o dourado. */
+  --chart-guide: 78 82 91;
+
   --smile: 61 139 253;
   --smile-soft: 124 176 255;
   --smile-dim: 22 35 54;
@@ -78,6 +84,9 @@
   --vision: 165 123 28;
   --vision-soft: 210 176 92;
   --vision-dim: 247 240 221;
+
+  /* No claro o fundo é branco, então a guia pode ser um cinza médio escuro. */
+  --chart-guide: 82 89 99;
 
   --smile: 26 108 224;
   --smile-soft: 92 150 240;
