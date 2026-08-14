@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { PeriodFilter } from "@/components/shell/PeriodFilter";
 import { Metric, MiniMetric, Panel, PanelHeader, Progress, Badge, LinkCard } from "@/components/ui/primitives";
-import { BarChart, SplitBar } from "@/components/charts/BarChart";
+import { SplitBar } from "@/components/charts/BarChart";
+import { FluxoChart } from "@/components/charts/FluxoChart";
 import { MetaPaceChart } from "@/components/charts/MetaPaceChart";
 import { formatBRL, formatDateBR, formatPercent } from "@/lib/format";
 import { resolvePeriod, previousPeriod, daysUntil } from "@/lib/period";
@@ -100,7 +101,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
           <PanelHeader title="Faturamento, despesas e lucro" description={`Mês a mês · ${new Date().getFullYear()}`} />
-          <BarChart
+          <FluxoChart
             groups={chart}
             series={[
               { label: "Faturamento", color: "rgb(var(--vision))" },
