@@ -117,10 +117,10 @@ export function NovaRecorrenciaButton({ options }: { options: FormOptions }) {
   );
 }
 
-export function NovaReceitaButton({ options, empresaId }: { options: FormOptions; empresaId?: string }) {
+export function NovaReceitaButton({ options, empresaId, extra, label = "Receita" }: { options: FormOptions; empresaId?: string; extra?: boolean; label?: string }) {
   return (
-    <DrawerHost label="Receita" title="Nova receita">
-      {(close) => <ReceitaForm options={options} onDone={close} empresaId={empresaId} />}
+    <DrawerHost label={label} title={extra ? "Receita extra" : "Nova receita"}>
+      {(close) => <ReceitaForm options={options} onDone={close} empresaId={empresaId} extra={extra} />}
     </DrawerHost>
   );
 }

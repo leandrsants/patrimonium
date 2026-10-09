@@ -7,6 +7,8 @@ export type FormOptions = {
   canais: CanalAquisicao[];
   produtos: ProdutoServico[];
   clientes: Pick<Cliente, "id" | "nome">[];
+  /** Fontes de renda extra não encerradas (Sonati, Danilo, Jiu-jítsu…). */
+  fontesExtras?: { id: string; nome: string }[];
 };
 
 export const empresaOptions = (o: FormOptions) => o.empresas.map((e) => ({ value: e.id, label: e.nome }));

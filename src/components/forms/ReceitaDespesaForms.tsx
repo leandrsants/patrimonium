@@ -7,9 +7,21 @@ import { FormFields, FormFooter, useFormSubmit } from "@/components/forms/FormSh
 import { criarReceita, criarDespesa } from "@/lib/actions";
 import { canalOptions, categoriaOptions, clienteOptions, contaOptions, hoje, type FormOptions } from "@/components/forms/options";
 
-export function ReceitaForm({ options, onDone, empresaId }: { options: FormOptions; onDone: () => void; empresaId?: string }) {
+export function ReceitaForm({
+  options,
+  onDone,
+  empresaId,
+  extra,
+}: {
+  options: FormOptions;
+  onDone: () => void;
+  empresaId?: string;
+  /** Abre já como receita extra (página Extras). */
+  extra?: boolean;
+}) {
   const { pending, error, run } = useFormSubmit(onDone);
-  const [natureza, setNatureza] = useState<"receita_empresarial" | "receita_extra">(empresaId ? "receita_empresarial" : "receita_empresarial");
+  const [natureza, setNatureza] = useState<"receita_empresarial" | "receita_extra">(extra ? "receita_extra" : "receita_empresarial");
+  const [fonte, setFonte] = useState("");
   const [empresa, setEmpresa] = useState(empresaId ?? options.empresas[0]?.id ?? "");
   const [categoria, setCategoria] = useState("");
   const [conta, setConta] = useState(options.contas[0]?.id ?? "");
@@ -35,9 +47,14 @@ export function ReceitaForm({ options, onDone, empresaId }: { options: FormOptio
             <Select value={empresa} onChange={setEmpresa} options={options.empresas.map((e) => ({ value: e.id, label: e.nome }))} />
           </Field>
         ) : (
-          <Field label="Categoria (extra)">
-            <Select value={categoria} onChange={setCategoria} options={categoriaOptions(options, ["extra"])} placeholder="Selecionar…" />
-          </Field>
+          <>
+            <Field label="Fonte" hint="Sonati, Danilo, Jiu-jítsu… Sem fonte, a receita não conta na Meta 10K (ex.: presentes).">
+              <Select value={fonte} onChange={setFonte} options={(options.fontesExtras ?? []).map((f) => ({ value: f.id, label: f.nome }))} placeholder="Sem fonte" />
+            </Field>
+            <Field label="Categoria (extra)">
+              <Select value={categoria} onChange={setCategoria} options={categoriaOptions(options, ["extra"])} placeholder="Selecionar…" />
+            </Field>
+          </>
         )}
         <Field label="Cliente">
           <Select value={cliente} onChange={setCliente} options={clienteOptions(options)} placeholder="Opcional" />
@@ -67,7 +84,7 @@ export function ReceitaForm({ options, onDone, empresaId }: { options: FormOptio
           <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} />
         </Field>
         {natureza === "receita_extra" ? (
-          <p className="text-2xs text-ink-dim">Receitas extras entram no total recebido e no patrimônio, mas nunca no faturamento, CAC, ticket ou Meta 10K.</p>
+          <p className="text-2xs text-ink-dim">Receitas extras de uma fonte entram no total recebido, no patrimônio, no faturamento total e na Meta 10K — nunca no CAC, ticket ou lucro das empresas.</p>
         ) : null}
       </FormFields>
 
@@ -87,6 +104,7 @@ export function ReceitaForm({ options, onDone, empresaId }: { options: FormOptio
               data,
               status: recebido as "recebido" | "previsto",
               observacao: obs,
+              fonte_extra_id: fonte,
             }),
           )
         }

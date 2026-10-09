@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FormOptions } from "@/components/forms/options";
 import type {
+  AlunoJiujitsu,
   Assinatura,
   Campanha,
   Cartao,
@@ -12,6 +13,8 @@ import type {
   ContaSaldo,
   DespesaRecorrente,
   Empresa,
+  FonteExtra,
+  FonteExtraRecorrencia,
   Lancamento,
   Meta,
   Oportunidade,
@@ -183,11 +186,43 @@ export async function getLancamentos(): Promise<Lancamento[]> {
   const c = await sb();
   if (!c) return [];
   // conta_id e conta_destino_id são ambas FK para contas -> desambiguar o embed pela coluna.
-  const { data } = await c
-    .from("lancamentos_financeiros")
-    .select("*, categoria:categorias_financeiras(nome, conta_na_meta), cliente:clientes(nome), conta:conta_id(nome)")
-    .order("data_competencia", { ascending: false });
-  return (data as Lancamento[]) ?? [];
+  // Paginado: o PostgREST corta em 1000 linhas por requisição — sem o laço, os
+  // totais passariam a sair truncados sem aviso quando o histórico crescer.
+  const pagina = 1000;
+  let todos: Lancamento[] = [];
+  for (let de = 0; ; de += pagina) {
+    const { data } = await c
+      .from("lancamentos_financeiros")
+      .select("*, categoria:categorias_financeiras(nome, conta_na_meta), cliente:clientes(nome), conta:conta_id(nome), fonte_extra:fonte_extra_id(nome, cor, conta_na_meta)")
+      .order("data_competencia", { ascending: false })
+      .order("id")
+      .range(de, de + pagina - 1);
+    const lote = (data as Lancamento[]) ?? [];
+    todos = todos.concat(lote);
+    if (lote.length < pagina) break;
+  }
+  return todos;
+}
+
+export async function getFontesExtras(): Promise<FonteExtra[]> {
+  const c = await sb();
+  if (!c) return [];
+  const { data } = await c.from("fontes_extras").select("*").order("nome");
+  return (data as FonteExtra[]) ?? [];
+}
+
+export async function getRecorrenciasExtras(): Promise<FonteExtraRecorrencia[]> {
+  const c = await sb();
+  if (!c) return [];
+  const { data } = await c.from("fontes_extras_recorrencias").select("*").order("dia_mes");
+  return (data as FonteExtraRecorrencia[]) ?? [];
+}
+
+export async function getAlunosJiujitsu(): Promise<AlunoJiujitsu[]> {
+  const c = await sb();
+  if (!c) return [];
+  const { data } = await c.from("alunos_jiujitsu").select("*").order("nome");
+  return (data as AlunoJiujitsu[]) ?? [];
 }
 
 export async function getComprasCartao(): Promise<CompraCartao[]> {
@@ -220,13 +255,14 @@ export async function getMetaConfirmado(): Promise<number> {
 
 // ---------------------------------------------------- OPÇÕES PARA FORMULÁRIOS
 export async function getFormOptions(): Promise<FormOptions> {
-  const [empresas, contas, categorias, canais, produtos, clientes] = await Promise.all([
+  const [empresas, contas, categorias, canais, produtos, clientes, fontesExtras] = await Promise.all([
     getEmpresas(),
     getContas(),
     getCategorias(),
     getCanais(),
     getProdutos(),
     getClientes(),
+    getFontesExtras(),
   ]);
   return {
     empresas,
@@ -235,6 +271,7 @@ export async function getFormOptions(): Promise<FormOptions> {
     canais,
     produtos,
     clientes: clientes.map((c) => ({ id: c.id, nome: c.nome })),
+    fontesExtras: fontesExtras.filter((f) => f.status !== "encerrada").map((f) => ({ id: f.id, nome: f.nome })),
   };
 }
 

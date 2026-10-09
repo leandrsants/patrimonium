@@ -229,6 +229,9 @@ export type Lancamento = {
   compra_cartao_id: string | null;
   numero_parcela_cartao: number | null;
   despesa_recorrente_id: string | null;
+  fonte_extra_id?: string | null;
+  fonte_extra_recorrencia_id?: string | null;
+  competencia_referencia?: string | null;
   conta_id: string;
   conta_destino_id: string | null;
   valor: number;
@@ -244,6 +247,41 @@ export type Lancamento = {
   categoria?: { nome: string; conta_na_meta?: boolean } | null;
   cliente?: { nome: string } | null;
   conta?: { nome: string } | null;
+  /** Fonte de renda extra (Sonati, Danilo, Jiu-jítsu…). */
+  fonte_extra?: { nome: string; cor: string; conta_na_meta: boolean } | null;
+};
+
+export type FonteExtra = {
+  id: string;
+  nome: string;
+  contato: string | null;
+  tipo: "fixa" | "variavel";
+  cor: string;
+  status: "ativa" | "pausada" | "encerrada";
+  observacao: string | null;
+  conta_padrao_id: string | null;
+  conta_na_meta: boolean;
+};
+
+export type FonteExtraRecorrencia = {
+  id: string;
+  fonte_id: string;
+  descricao: string | null;
+  valor: number;
+  dia_mes: number;
+  data_inicio: string;
+  data_fim: string | null;
+  ativa: boolean;
+};
+
+export type AlunoJiujitsu = {
+  id: string;
+  fonte_id: string;
+  nome: string;
+  mensalidade: number;
+  data_entrada: string;
+  data_saida: string | null;
+  observacao: string | null;
 };
 
 export type CompraCartao = {

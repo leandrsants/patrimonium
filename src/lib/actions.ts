@@ -691,12 +691,14 @@ export async function criarReceita(input: {
   status: "previsto" | "recebido";
   cliente_id?: string;
   observacao?: string;
+  fonte_extra_id?: string;
 }): Promise<ActionResult> {
   try {
     const c = await client();
     const { error } = await c.from("lancamentos_financeiros").insert({
       tipo: "entrada",
       natureza: input.natureza,
+      fonte_extra_id: input.natureza === "receita_extra" ? input.fonte_extra_id || null : null,
       empresa_id: input.natureza === "receita_empresarial" ? input.empresa_id || null : null,
       categoria_id: input.categoria_id || null,
       cliente_id: input.cliente_id || null,
@@ -1044,6 +1046,185 @@ export async function gerarLancamentoRecorrente(despesaId: string, contaId: stri
       p_idempotency_key: randomUUID(),
     });
     if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ------------------------------------------------------------ FONTES EXTRAS
+type FonteExtraInput = {
+  nome: string;
+  contato?: string;
+  tipo: "fixa" | "variavel";
+  cor: string;
+  status: "ativa" | "pausada" | "encerrada";
+  observacao?: string;
+  conta_padrao_id?: string;
+};
+
+function fonteExtraRow(input: FonteExtraInput) {
+  return {
+    nome: input.nome.trim(),
+    contato: input.contato?.trim() || null,
+    tipo: input.tipo,
+    cor: input.cor,
+    status: input.status,
+    observacao: input.observacao?.trim() || null,
+    conta_padrao_id: input.conta_padrao_id || null,
+  };
+}
+
+export async function criarFonteExtra(input: FonteExtraInput): Promise<ActionResult> {
+  try {
+    const c = await client();
+    if (!input.nome.trim()) throw new Error("Informe o nome da fonte.");
+    const { data, error } = await c.from("fontes_extras").insert(fonteExtraRow(input)).select("id").single();
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true, id: data.id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function atualizarFonteExtra(id: string, input: FonteExtraInput): Promise<ActionResult> {
+  try {
+    const c = await client();
+    if (!input.nome.trim()) throw new Error("Informe o nome da fonte.");
+    const { error } = await c
+      .from("fontes_extras")
+      .update({ ...fonteExtraRow(input), atualizado_em: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Cria (sem id) ou atualiza uma recorrência de pagamento de uma fonte extra. */
+export async function salvarRecorrenciaExtra(input: {
+  id?: string;
+  fonte_id: string;
+  descricao?: string;
+  valor: number;
+  dia_mes: number;
+  data_inicio: string;
+  data_fim?: string;
+}): Promise<ActionResult> {
+  try {
+    const c = await client();
+    if (!Number.isInteger(input.dia_mes) || input.dia_mes < 1 || input.dia_mes > 31) throw new Error("Dia do mês deve estar entre 1 e 31.");
+    const row = {
+      fonte_id: input.fonte_id,
+      descricao: input.descricao?.trim() || null,
+      valor: input.valor,
+      dia_mes: input.dia_mes,
+      data_inicio: input.data_inicio,
+      data_fim: input.data_fim || null,
+    };
+    const { error } = input.id
+      ? await c.from("fontes_extras_recorrencias").update({ ...row, atualizado_em: new Date().toISOString() }).eq("id", input.id)
+      : await c.from("fontes_extras_recorrencias").insert(row);
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Encerra a recorrência (não apaga): deixa de gerar previstos a partir de agora. */
+export async function encerrarRecorrenciaExtra(id: string): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { error } = await c
+      .from("fontes_extras_recorrencias")
+      .update({ ativa: false, atualizado_em: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Cria (sem id) ou atualiza um aluno do Jiu-jítsu. Saída = preencher data_saida. */
+export async function salvarAlunoJiujitsu(input: {
+  id?: string;
+  fonte_id: string;
+  nome: string;
+  mensalidade: number;
+  data_entrada: string;
+  data_saida?: string;
+  observacao?: string;
+}): Promise<ActionResult> {
+  try {
+    const c = await client();
+    if (!input.nome.trim()) throw new Error("Informe o nome do aluno.");
+    const row = {
+      fonte_id: input.fonte_id,
+      nome: input.nome.trim(),
+      mensalidade: input.mensalidade,
+      data_entrada: input.data_entrada,
+      data_saida: input.data_saida || null,
+      observacao: input.observacao?.trim() || null,
+    };
+    const { error } = input.id
+      ? await c.from("alunos_jiujitsu").update({ ...row, atualizado_em: new Date().toISOString() }).eq("id", input.id)
+      : await c.from("alunos_jiujitsu").insert(row);
+    if (error) throw error;
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Gera os previstos das fontes extras para a competência (YYYY-MM-01).
+ * Idempotente no banco (índice único recorrência × competência): chamar de
+ * novo nunca duplica. Não revalida — é chamada durante a renderização.
+ */
+export async function gerarPrevistosExtras(competencia: string): Promise<ActionResult> {
+  try {
+    const c = await client();
+    const { error } = await c.rpc("gerar_previstos_extras", { p_competencia: competencia });
+    if (error) throw error;
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Marca um previsto de fonte extra como recebido. Atualiza o próprio
+ * lançamento (nunca cria outro), com valor, data e conta editáveis.
+ */
+export async function marcarExtraRecebido(id: string, input: { valor: number; data: string; conta_id: string }): Promise<ActionResult> {
+  try {
+    const c = await client();
+    if (!(input.valor > 0)) throw new Error("Valor deve ser maior que zero.");
+    if (!input.conta_id) throw new Error("Selecione a conta.");
+    const { data, error } = await c
+      .from("lancamentos_financeiros")
+      .update({
+        status: "recebido",
+        valor: input.valor,
+        data_pagamento: input.data,
+        conta_id: input.conta_id,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("natureza", "receita_extra")
+      .eq("status", "previsto")
+      .select("id");
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error("Lançamento não está mais previsto (já recebido ou cancelado).");
     revalidateAll();
     return { ok: true };
   } catch (e) {
