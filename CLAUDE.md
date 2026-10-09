@@ -10,7 +10,7 @@
 - A interface deve ser minimalista.
 - Não criar páginas ou funcionalidades fora da especificação sem aprovação.
 - Produtos futuros (mentoria, curso, comunidade) ficam invisíveis até serem ativados.
-- Extras nunca entram na meta, no faturamento ou no CAC das empresas.
+- Fontes extras (Sonati, Danilo, Jiu-jítsu…) entram na Meta 10K e no faturamento total; nunca no CAC, ticket ou lucro das empresas. Extras avulsos sem fonte (ex.: presentes) ficam fora da meta.
 
 ## Banco de dados
 

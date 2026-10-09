@@ -29,17 +29,29 @@ export function LancamentosTable({
   emptyLabel: string;
 }) {
   const [filtro, setFiltro] = useState<FiltroEmpresa>("todos");
+  const [fonte, setFonte] = useState("");
 
   const base = lancamentos.filter((l) => l.tipo === tipo);
   const filtradas = useMemo(() => {
     if (filtro === "todos") return base;
-    if (filtro === "extra") return base.filter((l) => l.natureza === "receita_extra");
+    if (filtro === "extra") {
+      const extras = base.filter((l) => l.natureza === "receita_extra");
+      if (fonte === "") return extras;
+      return fonte === "sem" ? extras.filter((l) => !l.fonte_extra_id) : extras.filter((l) => l.fonte_extra_id === fonte);
+    }
     if (filtro === "pessoal") return base.filter((l) => l.natureza === "despesa_pessoal");
     return base.filter((l) => l.empresa_id && empresasMap[l.empresa_id]?.slug === filtro);
-  }, [base, filtro, empresasMap]);
+  }, [base, filtro, fonte, empresasMap]);
 
   // Cancelado nao entra em nenhum calculo do metrics.ts -- o total da tabela
   // precisa concordar com isso, senao o rodape briga com o dashboard.
+  // Fontes presentes nos lançamentos (nome + cor), para o subfiltro de extras.
+  const fontes = useMemo(() => {
+    const m = new Map<string, { nome: string; cor: string }>();
+    for (const l of base) if (l.fonte_extra_id && l.fonte_extra) m.set(l.fonte_extra_id, l.fonte_extra);
+    return [...m.entries()].map(([id, f]) => ({ id, ...f })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [base]);
+
   const total = filtradas.reduce((s, l) => (l.status === "cancelado" ? s : s + Number(l.valor)), 0);
 
   return (
@@ -47,7 +59,10 @@ export function LancamentosTable({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedControl
           value={filtro}
-          onChange={(v) => setFiltro(v as FiltroEmpresa)}
+          onChange={(v) => {
+            setFiltro(v as FiltroEmpresa);
+            setFonte("");
+          }}
           options={[
             { value: "todos", label: "Tudo" },
             { value: "vision", label: "Vision" },
@@ -55,6 +70,13 @@ export function LancamentosTable({
             ...(tipo === "entrada" ? [{ value: "extra", label: "Extra" }] : [{ value: "pessoal", label: "Pessoal" }]),
           ]}
         />
+        {filtro === "extra" && fontes.length > 0 ? (
+          <SegmentedControl
+            value={fonte}
+            onChange={setFonte}
+            options={[{ value: "", label: "Todas" }, ...fontes.map((f) => ({ value: f.id, label: f.nome })), { value: "sem", label: "Sem fonte" }]}
+          />
+        ) : null}
         <span className="text-sm tnum text-ink-soft">Total: <span className="font-semibold text-ink">{formatBRL(total)}</span></span>
       </div>
 
@@ -81,9 +103,18 @@ export function LancamentosTable({
                 const cancelado = l.status === "cancelado";
                 return (
                   <tr key={l.id} className="border-b border-line/70 last:border-0">
-                    <td className="px-4 py-3 text-ink-faint">{formatDateBR(l.data_pagamento ?? l.data_competencia)}</td>
+                    <td className="px-4 py-3 text-ink-faint">{formatDateBR(l.data_pagamento ?? l.data_vencimento ?? l.data_competencia)}</td>
                     <td className={`px-4 py-3 ${cancelado ? "text-ink-faint line-through" : "text-ink-soft"}`}>{l.observacao ?? l.categoria?.nome ?? l.cliente?.nome ?? "—"}{l.entra_no_cac ? <span className="ml-2 text-2xs text-vision no-underline">CAC</span> : null}</td>
-                    <td className="px-4 py-3 text-ink-faint">{classif(l, empresasMap)}</td>
+                    <td className="px-4 py-3 text-ink-faint">
+                      {l.fonte_extra ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: l.fonte_extra.cor }} />
+                          {l.fonte_extra.nome}
+                        </span>
+                      ) : (
+                        classif(l, empresasMap)
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-ink-faint">{l.conta?.nome ?? "—"}</td>
                     <td className={`px-4 py-3 text-right tnum ${cancelado ? "text-ink-faint line-through" : tipo === "entrada" ? "text-positive" : "text-negative"}`}>{formatBRL(l.valor)}</td>
                     <td className="px-4 py-3 text-right"><Badge accent={STATUS_ACCENT[l.status]}>{l.status}</Badge></td>

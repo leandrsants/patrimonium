@@ -48,7 +48,7 @@ export default async function ConfiguracoesPage() {
               <div className="flex justify-between"><span className="text-ink-faint">Nome</span><span className="text-ink-soft">{meta.nome}</span></div>
               <div className="flex justify-between"><span className="text-ink-faint">Valor-alvo</span><span className="tnum text-ink-soft">{formatBRL(meta.valor_alvo)}</span></div>
               <div className="flex justify-between"><span className="text-ink-faint">Período</span><span className="text-ink-soft">{formatDateBR(meta.data_inicio)} — {formatDateBR(meta.data_fim)}</span></div>
-              <div className="flex justify-between"><span className="text-ink-faint">Inclui extras</span><span className="text-ink-soft">{meta.inclui_extras ? "Sim" : "Não"}</span></div>
+              <div className="flex justify-between"><span className="text-ink-faint">Inclui extras</span><span className="text-ink-soft">Fontes extras (Sonati, Danilo, Jiu-jítsu)</span></div>
             </div>
           ) : (
             <p className="text-sm text-ink-faint">Nenhuma meta ativa.</p>

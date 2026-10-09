@@ -9,18 +9,19 @@ import { MetaPaceChart } from "@/components/charts/MetaPaceChart";
 import { formatBRL, formatDateBR, formatPercent } from "@/lib/format";
 import { resolvePeriod, previousPeriod, daysUntil } from "@/lib/period";
 import { computeDashboard, computeAttention, monthlySeries, buildMetaSerie, pctDelta } from "@/lib/metrics";
+import { recebidoPorFonte } from "@/lib/extras";
 import {
   getEmpresas, getLancamentos, getVendas, getParcelasSituacao, getAssinaturas,
-  getContasSaldos, getComprasCartao, getOportunidades, getMetaAtiva, getMetaConfirmado,
+  getContasSaldos, getComprasCartao, getOportunidades, getMetaAtiva, getMetaConfirmado, getFontesExtras,
 } from "@/lib/data";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const period = resolvePeriod(sp);
 
-  const [empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras, oportunidades, meta, metaConfirmado] = await Promise.all([
+  const [empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras, oportunidades, meta, metaConfirmado, fontesExtras] = await Promise.all([
     getEmpresas(), getLancamentos(), getVendas(), getParcelasSituacao(), getAssinaturas(),
-    getContasSaldos(), getComprasCartao(), getOportunidades(), getMetaAtiva(), getMetaConfirmado(),
+    getContasSaldos(), getComprasCartao(), getOportunidades(), getMetaAtiva(), getMetaConfirmado(), getFontesExtras(),
   ]);
 
   const m = computeDashboard({ empresas, lancamentos, vendas, parcelas, assinaturas, saldos, compras }, period);
@@ -30,6 +31,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const attention = computeAttention({ parcelas, assinaturas, vendas, oportunidades });
   const chart = monthlySeries(vendas, lancamentos, new Date().getFullYear());
   const metaSerie = meta ? buildMetaSerie(lancamentos, meta) : [];
+  // Fontes extras (Sonati, Danilo, Jiu-jítsu): recebido no período, ao lado das empresas.
+  const extrasFonte = recebidoPorFonte(lancamentos, fontesExtras.filter((f) => f.conta_na_meta), period).filter((f) => f.valor > 0 || fontesExtras.find((x) => x.id === f.id)?.status === "ativa");
 
   const metaPct = meta ? Math.min(100, (metaConfirmado / Number(meta.valor_alvo)) * 100) : 0;
   const metaFalta = meta ? Math.max(0, Number(meta.valor_alvo) - metaConfirmado) : 0;
@@ -58,7 +61,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {/* Meta + secundários */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
-          <PanelHeader title="Meta 10K 2026" description={meta ? `${formatDateBR(meta.data_inicio)} a ${formatDateBR(meta.data_fim)} · Vision + Digital Smile · somente recebido` : undefined} action={<Badge accent="vision">{formatPercent(metaPct, 1)}</Badge>} />
+          <PanelHeader title="Meta 10K 2026" description={meta ? `${formatDateBR(meta.data_inicio)} a ${formatDateBR(meta.data_fim)} · Vision + Digital Smile + extras · somente recebido` : undefined} action={<Badge accent="vision">{formatPercent(metaPct, 1)}</Badge>} />
           <div className="mb-3 flex items-end justify-between">
             <span className="text-3xl font-semibold tnum text-ink">{formatBRL(metaConfirmado)}</span>
             <span className="text-sm text-ink-faint">de {formatBRL(meta?.valor_alvo)}</span>
@@ -111,14 +114,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           />
         </Panel>
         <Panel>
-          <PanelHeader title="Faturamento por empresa" />
+          <PanelHeader title="Faturamento por empresa" description="Empresas pelo faturamento; extras pelo recebido" />
           <SplitBar
             parts={[
               { label: "Vision", value: m.vision.faturamento, color: "rgb(var(--vision))" },
               { label: "Digital Smile", value: m.digitalSmile.faturamento, color: "rgb(var(--smile))" },
+              ...extrasFonte.map((f) => ({ label: f.nome, value: f.valor, color: f.cor })),
             ]}
           />
-          <p className="mt-6 text-2xs text-ink-dim">Receitas extras não entram no faturamento das empresas.</p>
+          <p className="mt-6 text-2xs text-ink-dim">Extras (Sonati, Danilo, Jiu-jítsu) entram no faturamento total e na Meta 10K; ficam fora do CAC e do lucro das empresas.</p>
         </Panel>
       </div>
 

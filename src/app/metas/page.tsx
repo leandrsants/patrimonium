@@ -5,6 +5,7 @@ import { Metric, Panel, PanelHeader, Progress, Badge, MiniMetric } from "@/compo
 import { formatBRL, formatDateBR, formatPercent } from "@/lib/format";
 import { daysUntil } from "@/lib/period";
 import { getMetaAtiva, getMetaConfirmado, getValorEmRevisao, getLancamentos } from "@/lib/data";
+import { contaNaMeta } from "@/lib/extras";
 
 export default async function MetasPage() {
   const [meta, confirmado, emRevisao, lancamentos] = await Promise.all([
@@ -21,12 +22,13 @@ export default async function MetasPage() {
   const ritmoDiario = decorrido > 0 ? confirmado / decorrido : 0;
   const projecao = confirmado + ritmoDiario * dias;
 
-  // Evolução mensal do recebido elegível (Vision + Digital Smile)
+  // Evolução mensal do recebido elegível (Vision + Digital Smile + fontes extras) —
+  // mesmo filtro da view meta_10k_progresso, para o gráfico somar o mesmo que o total.
   const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   const ano = meta ? Number(meta.data_inicio.slice(0, 4)) : new Date().getFullYear();
   const evolucao = meses.map((label, m) => {
     const valor = lancamentos
-      .filter((l) => l.tipo === "entrada" && l.natureza === "receita_empresarial" && l.status === "recebido" && (l.data_pagamento ?? "").startsWith(`${ano}-${String(m + 1).padStart(2, "0")}`) && (!meta || ((l.data_pagamento ?? "") >= meta.data_inicio && (l.data_pagamento ?? "") <= meta.data_fim)))
+      .filter((l) => contaNaMeta(l) && l.status === "recebido" && (l.data_pagamento ?? "").startsWith(`${ano}-${String(m + 1).padStart(2, "0")}`) && (!meta || ((l.data_pagamento ?? "") >= meta.data_inicio && (l.data_pagamento ?? "") <= meta.data_fim)))
       .reduce((s, l) => s + Number(l.valor), 0);
     return { label, valor };
   });
@@ -34,12 +36,12 @@ export default async function MetasPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Metas" title="Metas" subtitle="Objetivos de recebimento das empresas" accent="vision" />
+      <PageHeader eyebrow="Metas" title="Metas" subtitle="Objetivos de recebimento: empresas e fontes extras" accent="vision" />
 
       <Panel>
         <PanelHeader
           title={meta?.nome ?? "Meta 10K 2026"}
-          description={meta ? `${formatDateBR(meta.data_inicio)} a ${formatDateBR(meta.data_fim)} · Vision + Digital Smile · somente dinheiro efetivamente recebido · extras não contam` : undefined}
+          description={meta ? `${formatDateBR(meta.data_inicio)} a ${formatDateBR(meta.data_fim)} · Vision + Digital Smile + extras (Sonati, Danilo, Jiu-jítsu) · somente dinheiro efetivamente recebido` : undefined}
           action={<Badge accent="vision">{formatPercent(pct, 1)}</Badge>}
         />
         <div className="mb-3 flex items-end justify-between">
@@ -76,7 +78,7 @@ export default async function MetasPage() {
         <PanelHeader title="Regras da meta" />
         <ul className="space-y-1.5 text-sm text-ink-faint">
           <li>• Base: dinheiro efetivamente recebido (não vendido).</li>
-          <li>• Empresas: Vision + Digital Smile. Extras (Sonati, Trium…) não contam.</li>
+          <li>• Conta: Vision + Digital Smile + fontes extras (Sonati, Danilo, Jiu-jítsu). Extras avulsos sem fonte (ex.: presentes) não contam.</li>
           <li>• Pipeline sem venda/pagamento confirmado não conta.</li>
           <li>• Valores em revisão são exibidos à parte até confirmação humana.</li>
           <li>• Metas futuras (2027+) podem ser criadas sem alterar o sistema.</li>

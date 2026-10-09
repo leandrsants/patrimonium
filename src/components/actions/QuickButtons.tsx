@@ -8,6 +8,7 @@ import { VendaForm } from "@/components/forms/VendaForm";
 import { CampanhaForm, AssinaturaForm } from "@/components/forms/SmallForms";
 import { ContaForm, TransferenciaForm, CartaoForm, CompraCartaoForm, DespesaRecorrenteForm } from "@/components/forms/ContasCartoesForms";
 import { ReceitaForm, DespesaForm } from "@/components/forms/ReceitaDespesaForms";
+import { FonteExtraForm } from "@/components/extras/ExtrasForms";
 import type { FormOptions } from "@/components/forms/options";
 
 function TriggerButton({ label, onClick, variant = "secondary" }: { label: string; onClick: () => void; variant?: "primary" | "secondary" }) {
@@ -129,6 +130,14 @@ export function NovaDespesaButton({ options, empresaId }: { options: FormOptions
   return (
     <DrawerHost label="Despesa" title="Nova despesa">
       {(close) => <DespesaForm options={options} onDone={close} empresaId={empresaId} />}
+    </DrawerHost>
+  );
+}
+
+export function NovaFonteExtraButton({ options }: { options: FormOptions }) {
+  return (
+    <DrawerHost label="Nova fonte" title="Nova fonte de renda extra" variant="primary">
+      {(close) => <FonteExtraForm contas={options.contas.map((c) => ({ value: c.id, label: c.nome }))} onDone={close} />}
     </DrawerHost>
   );
 }

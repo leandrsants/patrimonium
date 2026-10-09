@@ -11,6 +11,7 @@ import type {
   Venda,
 } from "@/lib/types";
 import { inRange, previousPeriod, type Period } from "@/lib/period";
+import { contaNaMeta } from "@/lib/extras";
 import { safeRatio, formatBRL, formatDateBR } from "@/lib/format";
 import { cac as calcCac, custoPorVenda as calcCPV, ticketMedio as calcTicket, ratio, somarProspeccao, type ProspeccaoAgregada } from "@/lib/calc";
 
@@ -255,10 +256,10 @@ export type MetaPonto = {
  * Série semanal do progresso da Meta 10K: quanto já entrou acumulado contra o
  * ritmo necessário para fechar no prazo (reta de 0 ao alvo entre início e fim).
  *
- * O filtro reproduz `meta_10k_progresso` (20260812110000): entrada recebida,
- * de receita empresarial OU de receita extra cuja categoria esteja marcada com
- * `conta_na_meta` — hoje só Sonati/Sonate. Datas são comparadas como string
- * ISO, que ordena corretamente e evita fuso.
+ * O filtro reproduz `meta_10k_progresso` (20261009100006) via `contaNaMeta`:
+ * entrada recebida de receita empresarial OU de receita extra de fonte/categoria
+ * marcada para a meta (Sonati, Danilo, Jiu-jítsu). Datas são comparadas como
+ * string ISO, que ordena corretamente e evita fuso.
  */
 export function buildMetaSerie(lancamentos: Lancamento[], meta: Meta, hojeISO?: string): MetaPonto[] {
   const inicio = meta.data_inicio;
@@ -269,10 +270,8 @@ export function buildMetaSerie(lancamentos: Lancamento[], meta: Meta, hojeISO?: 
   const contam = lancamentos
     .filter(
       (l) =>
-        l.tipo === "entrada" &&
+        contaNaMeta(l) &&
         l.status === "recebido" &&
-        (l.natureza === "receita_empresarial" ||
-          (l.natureza === "receita_extra" && l.categoria?.conta_na_meta === true)) &&
         l.data_pagamento !== null &&
         l.data_pagamento >= inicio &&
         l.data_pagamento <= fim,
